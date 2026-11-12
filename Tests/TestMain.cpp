@@ -248,6 +248,28 @@ TEST (nam_model_runs_real_inference_at_any_host_rate)
     }
 }
 
+TEST (nam_loads_every_architecture)
+{
+    // Every model format NAM ships examples for, including the newer A2 / Slimmable files
+    for (const char* f : { "wavenet.nam", "lstm.nam", "wavenet_a1_standard.nam", "A2.nam", "slimmable_container.nam",
+                           "slimmable_wavenet.nam", "wavenet_a2_feature_test.nam", "wavenet_condition_dsp.nam" })
+    {
+        try
+        {
+            NamModel m;
+            m.load (examples() / f);
+            m.prepare (44100.0, 256);
+            auto x = tst::sine (220.0, 44100.0, 22050, 0.2);
+            std::vector<double> y (x.size());
+            for (size_t i = 0; i < x.size(); i += 256) m.process (x.data() + i, y.data() + i, (int) std::min<size_t> (256, x.size() - i));
+            CHECK_MSG (tst::allFinite (y) && tst::rms (y, y.size() / 2) > 1e-6, "%s produced no usable output", f);
+            const auto meta = readCaptureMetadata (examples() / f);
+            INFO ("%-28s %-18s ok", f, meta.architecture.c_str());
+        }
+        catch (const std::exception& e) { CHECK_MSG (false, "%s: %s", f, e.what()); }
+    }
+}
+
 TEST (nam_resampled_output_matches_native)
 {
     // The same model at 44.1 kHz host must sound like it does natively (fundamental level match).

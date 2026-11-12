@@ -1,16 +1,50 @@
 #include "NamModel.h"
 
+#include <mutex>
 #include <stdexcept>
 #include <NAM/dsp.h>
 #include <NAM/get_dsp.h>
+#include <NAM/model_config.h>
+#include <NAM/container.h>
+#include <NAM/convnet.h>
+#include <NAM/linear.h>
+#include <NAM/lstm.h>
+#include <NAM/sequential.h>
+#include <NAM/wavenet/model.h>
 
 namespace namvx
 {
+namespace
+{
+// NeuralAmpModelerCore registers each architecture from a static initialiser in its own .cpp.
+// Some linkers (macOS ld64 with dead-stripping) can drop those, which surfaces as
+// "No config parser registered for architecture: SlimmableContainer". Registering every
+// architecture explicitly from here makes loading independent of the linker.
+void ensureArchitecturesRegistered()
+{
+    static std::once_flag once;
+    std::call_once (once, [] {
+        auto& reg = nam::ConfigParserRegistry::instance();
+        const std::pair<const char*, nam::ConfigParserFunction> all[] = {
+            { "WaveNet", nam::wavenet::create_config },
+            { "LSTM", nam::lstm::create_config },
+            { "ConvNet", nam::convnet::create_config },
+            { "Linear", nam::linear::create_config },
+            { "Sequential", nam::sequential::create_config },
+            { "SlimmableContainer", nam::container::create_config },
+        };
+        for (const auto& [name, fn] : all)
+            if (! reg.has (name)) reg.registerParser (name, fn);
+    });
+}
+} // namespace
+
 NamModel::NamModel() = default;
 NamModel::~NamModel() = default;
 
 void NamModel::load (const std::filesystem::path& file)
 {
+    ensureArchitecturesRegistered();
     nam::dspData config;
     std::unique_ptr<nam::DSP> loaded;
     try
