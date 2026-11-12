@@ -1,5 +1,5 @@
 #pragma once
-// Small, allocation-free DSP building blocks shared by every Namified module.
+// Small, allocation-free DSP building blocks shared by every Nam VX module.
 // All state is double precision (64-bit internal processing).
 
 #include <algorithm>
@@ -8,7 +8,7 @@
 #include <cstddef>
 #include <vector>
 
-namespace namified
+namespace namvx
 {
 constexpr double kPi = 3.14159265358979323846;
 constexpr double kTwoPi = 2.0 * kPi;
@@ -205,4 +205,4 @@ private:
     std::vector<double> data;
     size_t r = 0, w = 0, count = 0;
 };
-} // namespace namified
+} // namespace namvx

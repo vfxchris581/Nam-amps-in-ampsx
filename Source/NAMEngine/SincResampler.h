@@ -5,7 +5,7 @@
 #include <vector>
 #include "AudioEngine/DspCommon.h"
 
-namespace namified
+namespace namvx
 {
 class SincResampler
 {
@@ -33,4 +33,4 @@ private:
     double halfWidth = 32;  // kernel half width in input samples
     double pos = 0.0;       // read position (input samples) relative to hist[0]
 };
-} // namespace namified
+} // namespace namvx

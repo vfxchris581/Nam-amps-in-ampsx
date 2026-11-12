@@ -1,8 +1,8 @@
 #include "TubePanel.h"
 
-namespace namified
+namespace namvx
 {
-TubePanel::TubePanel (NamifiedProcessor& p)
+TubePanel::TubePanel (NamVXProcessor& p)
     : proc (p),
       preOn (p.getAPVTS(), pid::preTubeOn, "Enable"), paOn (p.getAPVTS(), pid::powerAmpOn, "Enable"),
       harmOn (p.getAPVTS(), pid::harmOn, "Enable"),
@@ -131,4 +131,4 @@ void TubePanel::resized()
         alwaysOn.setBounds (a.removeFromTop (44));
     }
 }
-} // namespace namified
+} // namespace namvx

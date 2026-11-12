@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Namified VERSION 0.1.0 LANGUAGES C CXX)
+project(NamVX VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -18,10 +18,10 @@ if(APPLE)
     endif()
 endif()
 
-option(NAMIFIED_BUILD_PLUGIN "Build the VST3 + Standalone application" ON)
-option(NAMIFIED_BUILD_TESTS  "Build the automated test suite" ON)
-option(NAMIFIED_BUILD_SCREENSHOT "Build the headless UI screenshot tool" OFF)
-option(NAMIFIED_HEADLESS_LINUX "Linux build without ALSA/JACK/Xrandr (CI/headless boxes)" OFF)
+option(NAMVX_BUILD_PLUGIN "Build the VST3 + Standalone application" ON)
+option(NAMVX_BUILD_TESTS  "Build the automated test suite" ON)
+option(NAMVX_BUILD_SCREENSHOT "Build the headless UI screenshot tool" OFF)
+option(NAMVX_HEADLESS_LINUX "Linux build without ALSA/JACK/Xrandr (CI/headless boxes)" OFF)
 
 # ----------------------------------------------------------------------------
 # Dependencies (all permissively licensed, pinned)
@@ -79,9 +79,9 @@ else()
 endif()
 
 # ----------------------------------------------------------------------------
-# Namified engine sources (shared by plugin and tests)
+# NamVX engine sources (shared by plugin and tests)
 # ----------------------------------------------------------------------------
-set(NAMIFIED_CORE_SOURCES
+set(NAMVX_CORE_SOURCES
     Source/NAMEngine/SincResampler.cpp
     Source/NAMEngine/NamModel.cpp
     Source/NAMMetadata/CaptureMetadata.cpp
@@ -103,21 +103,21 @@ set(NAMIFIED_CORE_SOURCES
     Source/AudioEngine/EngineParameters.cpp
     Source/AudioEngine/SignalChain.cpp)
 
-set(NAMIFIED_COMMON_DEFS
+set(NAMVX_COMMON_DEFS
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
     JUCE_DISPLAY_SPLASH_SCREEN=0
     JUCE_REPORT_APP_USAGE=0
     JUCE_STRICT_REFCOUNTEDPOINTER=1)
 
-if(NAMIFIED_HEADLESS_LINUX)
-    list(APPEND NAMIFIED_COMMON_DEFS JUCE_ALSA=0 JUCE_JACK=0 JUCE_USE_XRANDR=0
+if(NAMVX_HEADLESS_LINUX)
+    list(APPEND NAMVX_COMMON_DEFS JUCE_ALSA=0 JUCE_JACK=0 JUCE_USE_XRANDR=0
          JUCE_USE_XINERAMA=0 JUCE_USE_XCURSOR=0 JUCE_USE_XSHM=0 JUCE_USE_XRENDER=0)
 endif()
 
-function(namified_configure_target tgt)
+function(namvx_configure_target tgt)
     target_include_directories(${tgt} PRIVATE "${PROJECT_SOURCE_DIR}/Source")
-    target_compile_definitions(${tgt} PRIVATE ${NAMIFIED_COMMON_DEFS})
+    target_compile_definitions(${tgt} PRIVATE ${NAMVX_COMMON_DEFS})
     target_link_libraries(${tgt} PRIVATE nam_core)
     if(MSVC)
         target_compile_options(${tgt} PRIVATE /bigobj /W3 "$<$<CONFIG:Release>:/O2>")
@@ -127,11 +127,11 @@ function(namified_configure_target tgt)
     endif()
 endfunction()
 
-if(NAMIFIED_BUILD_PLUGIN)
+if(NAMVX_BUILD_PLUGIN)
     add_subdirectory(Source/Plugin)
 endif()
 
-if(NAMIFIED_BUILD_TESTS)
+if(NAMVX_BUILD_TESTS)
     enable_testing()
     add_subdirectory(Tests)
 endif()

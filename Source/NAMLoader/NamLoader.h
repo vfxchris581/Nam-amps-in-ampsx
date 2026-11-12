@@ -6,7 +6,7 @@
 #include "NAMEngine/NamModel.h"
 #include "NAMMetadata/CaptureMetadata.h"
 
-namespace namified
+namespace namvx
 {
 struct LoadedCapture
 {
@@ -26,4 +26,4 @@ public:
     /** Reads metadata + builds the network. Throws std::runtime_error on failure. */
     static LoadedCapture load (const std::filesystem::path& file);
 };
-} // namespace namified
+} // namespace namvx

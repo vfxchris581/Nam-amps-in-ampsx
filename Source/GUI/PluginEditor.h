@@ -5,15 +5,15 @@
 #include "TubePanel.h"
 #include "LibraryPanel.h"
 
-namespace namified
+namespace namvx
 {
-class NamifiedEditor : public juce::AudioProcessorEditor,
+class NamVXEditor : public juce::AudioProcessorEditor,
                        public juce::FileDragAndDropTarget,
                        private juce::ChangeListener
 {
 public:
-    explicit NamifiedEditor (NamifiedProcessor&);
-    ~NamifiedEditor() override;
+    explicit NamVXEditor (NamVXProcessor&);
+    ~NamVXEditor() override;
 
     void paint (juce::Graphics&) override;
     void paintOverChildren (juce::Graphics&) override;
@@ -31,8 +31,8 @@ private:
     void changeListenerCallback (juce::ChangeBroadcaster*) override;
     void refreshAll();
 
-    NamifiedProcessor& proc;
-    NamifiedLookAndFeel lnf;
+    NamVXProcessor& proc;
+    NamVXLookAndFeel lnf;
     juce::Component content;
     juce::ComboBox ampSelector, presetSelector;
     juce::TextButton prevPreset { "<" }, nextPreset { ">" }, savePreset { "Save" };
@@ -44,4 +44,4 @@ private:
     LibraryPanel libraryPanel;
     bool dragging = false;
 };
-} // namespace namified
+} // namespace namvx

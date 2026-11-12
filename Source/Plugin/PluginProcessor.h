@@ -7,19 +7,19 @@
 #include "PresetManager/AmpLibrary.h"
 #include "PresetManager/PresetManager.h"
 
-namespace namified
+namespace namvx
 {
-class NamifiedProcessor : public juce::AudioProcessor,
+class NamVXProcessor : public juce::AudioProcessor,
                           public juce::ChangeBroadcaster,
                           private juce::AudioProcessorValueTreeState::Listener,
                           private juce::AsyncUpdater,
                           private juce::Timer
 {
 public:
-    NamifiedProcessor();
+    NamVXProcessor();
     /** For tools/tests: use a specific library folder. */
-    explicit NamifiedProcessor (const juce::File& libraryRoot);
-    ~NamifiedProcessor() override;
+    explicit NamVXProcessor (const juce::File& libraryRoot);
+    ~NamVXProcessor() override;
 
     // ---- AudioProcessor ------------------------------------------------------------------
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
@@ -31,7 +31,7 @@ public:
 
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
-    const juce::String getName() const override { return "Namified"; }
+    const juce::String getName() const override { return "Nam VX"; }
     bool acceptsMidi() const override { return false; }
     bool producesMidi() const override { return false; }
     double getTailLengthSeconds() const override { return 0.5; }
@@ -43,7 +43,7 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
-    // ---- Namified API (message thread) -----------------------------------------------------
+    // ---- Nam VX API (message thread) -----------------------------------------------------
     juce::AudioProcessorValueTreeState& getAPVTS() noexcept { return apvts; }
     AmpLibrary& getLibrary() noexcept { return *library; }
     PresetManager& getPresets() noexcept { return *presets; }
@@ -127,6 +127,6 @@ private:
     double preparedRate = 0.0;
     int preparedBlock = 0;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NamifiedProcessor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NamVXProcessor)
 };
-} // namespace namified
+} // namespace namvx

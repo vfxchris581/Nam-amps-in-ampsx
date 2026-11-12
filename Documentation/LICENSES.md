@@ -10,8 +10,8 @@
 | VST3 SDK (via JUCE) | VST3 format | GPLv3 or Steinberg proprietary license (via JUCE) |
 
 ## JUCE — decide before you distribute binaries
-JUCE 8 is dual-licensed. To distribute Namified builds you need **one** of:
-- release Namified under the **AGPLv3** (source available to everyone who receives the app), or
+JUCE 8 is dual-licensed. To distribute Nam VX builds you need **one** of:
+- release Nam VX under the **AGPLv3** (source available to everyone who receives the app), or
 - a **JUCE license** (JUCE offers a free Personal tier below a revenue threshold, and paid tiers above it — check juce.com for the current terms).
 
 Building for your own use needs neither. `JUCE_DISPLAY_SPLASH_SCREEN` is set to 0, which JUCE only permits under a license that allows removing the splash screen.

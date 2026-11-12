@@ -1,6 +1,6 @@
 #include "EngineParameters.h"
 
-namespace namified
+namespace namvx
 {
 const std::vector<ParamSpec>& parameterSpecs()
 {
@@ -59,4 +59,4 @@ const std::vector<ParamSpec>& parameterSpecs()
     }();
     return specs;
 }
-} // namespace namified
+} // namespace namvx

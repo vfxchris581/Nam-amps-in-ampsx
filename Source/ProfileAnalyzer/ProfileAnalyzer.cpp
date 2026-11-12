@@ -5,7 +5,7 @@
 #include <random>
 #include "AudioEngine/DspCommon.h"
 
-namespace namified
+namespace namvx
 {
 namespace
 {
@@ -225,4 +225,4 @@ ProfileAnalyzer::estimateCoordinates (std::vector<KnobCoords>& coords, const std
     }
     return estimated;
 }
-} // namespace namified
+} // namespace namvx

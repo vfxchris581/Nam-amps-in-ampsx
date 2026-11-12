@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace namified
+namespace namvx
 {
 void CaptureBlender::prepare (double sampleRate, int maxBlockSize, std::vector<BlendSource> sources,
                               double fadeMs, double holdMs)
@@ -81,4 +81,4 @@ void CaptureBlender::process (const double* in, double* out, int n) noexcept
         w[i] = wi;
     }
 }
-} // namespace namified
+} // namespace namvx

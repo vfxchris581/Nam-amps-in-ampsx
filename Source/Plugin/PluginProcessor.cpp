@@ -2,7 +2,7 @@
 #include "GUI/PluginEditor.h"
 #include "ChannelManager/ChannelManager.h"
 
-namespace namified
+namespace namvx
 {
 namespace
 {
@@ -46,29 +46,29 @@ juce::AudioProcessorValueTreeState::ParameterLayout createLayout()
 juce::File defaultLibraryRoot()
 {
    #if JUCE_MAC
-    return juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory).getChildFile ("Application Support/Namified");
+    return juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory).getChildFile ("Application Support/Nam VX");
    #else
-    return juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory).getChildFile ("Namified");
+    return juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory).getChildFile ("Nam VX");
    #endif
 }
 
 } // namespace
 
-NamifiedProcessor::NamifiedProcessor()
+NamVXProcessor::NamVXProcessor()
     : AudioProcessor (BusesProperties().withInput ("Input", juce::AudioChannelSet::stereo(), true)
-                                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)), apvts (*this, nullptr, "NAMIFIED", createLayout())
+                                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)), apvts (*this, nullptr, "NAMVX", createLayout())
 {
     init (defaultLibraryRoot());
 }
 
-NamifiedProcessor::NamifiedProcessor (const juce::File& root)
+NamVXProcessor::NamVXProcessor (const juce::File& root)
     : AudioProcessor (BusesProperties().withInput ("Input", juce::AudioChannelSet::stereo(), true)
-                                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)), apvts (*this, nullptr, "NAMIFIED", createLayout())
+                                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)), apvts (*this, nullptr, "NAMVX", createLayout())
 {
     init (root);
 }
 
-void NamifiedProcessor::init (const juce::File& root)
+void NamVXProcessor::init (const juce::File& root)
 {
     library = std::make_unique<AmpLibrary> (root.getChildFile ("Library").getFullPathName().toStdString());
     presets = std::make_unique<PresetManager> (juce::File (library->presetsDir().string()),
@@ -90,14 +90,14 @@ void NamifiedProcessor::init (const juce::File& root)
     startTimerHz (10);
 }
 
-NamifiedProcessor::~NamifiedProcessor()
+NamVXProcessor::~NamVXProcessor()
 {
     stopTimer();
     apvts.removeParameterListener (pid::channel, this);
     workers.removeAllJobs (true, 20000);
 }
 
-bool NamifiedProcessor::isBusesLayoutSupported (const BusesLayout& l) const
+bool NamVXProcessor::isBusesLayoutSupported (const BusesLayout& l) const
 {
     const auto in = l.getMainInputChannelSet(), out = l.getMainOutputChannelSet();
     const bool inOk = in == juce::AudioChannelSet::mono() || in == juce::AudioChannelSet::stereo();
@@ -105,7 +105,7 @@ bool NamifiedProcessor::isBusesLayoutSupported (const BusesLayout& l) const
     return inOk && outOk;
 }
 
-void NamifiedProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
+void NamVXProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     const bool changed = sampleRate != preparedRate || samplesPerBlock > preparedBlock;
     preparedRate = sampleRate;
@@ -116,7 +116,7 @@ void NamifiedProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     setLatencySamples (chain.getLatencySamples());
 }
 
-void NamifiedProcessor::snapshotParameters (EngineParameters& p) const noexcept
+void NamVXProcessor::snapshotParameters (EngineParameters& p) const noexcept
 {
     for (int k = 0; k < kNumControls; ++k) p.knobs[(size_t) k] = knobParams[(size_t) k]->load();
     auto b = [] (std::atomic<float>* a) { return a->load() > 0.5f; };
@@ -137,7 +137,7 @@ void NamifiedProcessor::snapshotParameters (EngineParameters& p) const noexcept
 }
 
 template <typename T>
-void NamifiedProcessor::processAny (juce::AudioBuffer<T>& buffer)
+void NamVXProcessor::processAny (juce::AudioBuffer<T>& buffer)
 {
     juce::ScopedNoDenormals noDenormals;
     EngineParameters p;
@@ -148,34 +148,34 @@ void NamifiedProcessor::processAny (juce::AudioBuffer<T>& buffer)
                    std::min (numOut, buffer.getNumChannels()), buffer.getNumSamples());
 }
 
-void NamifiedProcessor::processBlock (juce::AudioBuffer<float>& b, juce::MidiBuffer&) { processAny (b); }
-void NamifiedProcessor::processBlock (juce::AudioBuffer<double>& b, juce::MidiBuffer&) { processAny (b); }
+void NamVXProcessor::processBlock (juce::AudioBuffer<float>& b, juce::MidiBuffer&) { processAny (b); }
+void NamVXProcessor::processBlock (juce::AudioBuffer<double>& b, juce::MidiBuffer&) { processAny (b); }
 
-juce::AudioProcessorEditor* NamifiedProcessor::createEditor() { return new NamifiedEditor (*this); }
+juce::AudioProcessorEditor* NamVXProcessor::createEditor() { return new NamVXEditor (*this); }
 
 // ---- amps -----------------------------------------------------------------------------------
-const AmpDefinition* NamifiedProcessor::getCurrentAmp() const { return library->find (currentAmpId.toStdString()); }
+const AmpDefinition* NamVXProcessor::getCurrentAmp() const { return library->find (currentAmpId.toStdString()); }
 
-int NamifiedProcessor::getCurrentChannel() const
+int NamVXProcessor::getCurrentChannel() const
 {
     const auto* a = getCurrentAmp();
     const int ch = (int) rp.channel->load();
     return a ? juce::jlimit (0, std::max (0, (int) a->channels.size() - 1), ch) : 0;
 }
 
-void NamifiedProcessor::setStatus (const juce::String& s)
+void NamVXProcessor::setStatus (const juce::String& s)
 {
     { std::lock_guard<std::mutex> l (statusLock); status = s; }
     sendChangeMessage();
 }
 
-juce::String NamifiedProcessor::getStatus() const
+juce::String NamVXProcessor::getStatus() const
 {
     std::lock_guard<std::mutex> l (statusLock);
     return status;
 }
 
-void NamifiedProcessor::loadAmp (const juce::String& ampId)
+void NamVXProcessor::loadAmp (const juce::String& ampId)
 {
     const auto* a = library->find (ampId.toStdString());
     if (a == nullptr) return;
@@ -194,7 +194,7 @@ void NamifiedProcessor::loadAmp (const juce::String& ampId)
     sendChangeMessage();
 }
 
-void NamifiedProcessor::rebuildRuntime()
+void NamVXProcessor::rebuildRuntime()
 {
     const auto* a = getCurrentAmp();
     if (a == nullptr) { chain.publishRuntime (nullptr); return; }
@@ -220,14 +220,14 @@ void NamifiedProcessor::rebuildRuntime()
     });
 }
 
-void NamifiedProcessor::updateAmp (const AmpDefinition& def, bool rebuild)
+void NamVXProcessor::updateAmp (const AmpDefinition& def, bool rebuild)
 {
     library->save (def);
     if (def.id == currentAmpId.toStdString() && rebuild) rebuildRuntime();
     sendChangeMessage();
 }
 
-void NamifiedProcessor::deleteAmp (const juce::String& ampId)
+void NamVXProcessor::deleteAmp (const juce::String& ampId)
 {
     library->remove (ampId.toStdString());
     if (ampId == currentAmpId)
@@ -239,7 +239,7 @@ void NamifiedProcessor::deleteAmp (const juce::String& ampId)
     sendChangeMessage();
 }
 
-void NamifiedProcessor::importFiles (const juce::StringArray& paths)
+void NamVXProcessor::importFiles (const juce::StringArray& paths)
 {
     if (importing.exchange (true)) return;
     std::vector<std::filesystem::path> files;
@@ -267,9 +267,9 @@ void NamifiedProcessor::importFiles (const juce::StringArray& paths)
     });
 }
 
-std::vector<PendingCapture> NamifiedProcessor::getPending() const { return pending; }
+std::vector<PendingCapture> NamVXProcessor::getPending() const { return pending; }
 
-void NamifiedProcessor::assignPending (int index, const juce::String& make, const juce::String& model, const juce::String& channel)
+void NamVXProcessor::assignPending (int index, const juce::String& make, const juce::String& model, const juce::String& channel)
 {
     if (index < 0 || index >= (int) pending.size() || make.trim().isEmpty() || model.trim().isEmpty()) return;
     const auto id = library->assignPending (pending[(size_t) index], make.trim().toStdString(), model.trim().toStdString(),
@@ -278,13 +278,13 @@ void NamifiedProcessor::assignPending (int index, const juce::String& make, cons
     loadAmp (id);
 }
 
-void NamifiedProcessor::discardPending (int index)
+void NamVXProcessor::discardPending (int index)
 {
     if (index >= 0 && index < (int) pending.size()) pending.erase (pending.begin() + index);
     sendChangeMessage();
 }
 
-void NamifiedProcessor::reanalyseCurrentAmp()
+void NamVXProcessor::reanalyseCurrentAmp()
 {
     const auto* a = getCurrentAmp();
     if (a == nullptr) return;
@@ -305,7 +305,7 @@ void NamifiedProcessor::reanalyseCurrentAmp()
 }
 
 // ---- impulse responses -------------------------------------------------------------------------
-juce::String NamifiedProcessor::loadImpulseResponse (int slot, const juce::File& f)
+juce::String NamVXProcessor::loadImpulseResponse (int slot, const juce::File& f)
 {
     slot = juce::jlimit (0, 1, slot);
     const auto err = chain.getCabinet().slot (slot).loadFile (f);
@@ -318,7 +318,7 @@ juce::String NamifiedProcessor::loadImpulseResponse (int slot, const juce::File&
     return err;
 }
 
-void NamifiedProcessor::clearImpulseResponse (int slot)
+void NamVXProcessor::clearImpulseResponse (int slot)
 {
     slot = juce::jlimit (0, 1, slot);
     chain.getCabinet().slot (slot).clear();
@@ -327,7 +327,7 @@ void NamifiedProcessor::clearImpulseResponse (int slot)
     sendChangeMessage();
 }
 
-void NamifiedProcessor::setEngineOptions (const EngineOptions& o)
+void NamVXProcessor::setEngineOptions (const EngineOptions& o)
 {
     const bool osChanged = o.oversampling != options.oversampling || o.linearPhase != options.linearPhase;
     const bool rtChanged = o.maxActive != options.maxActive || o.loudnessComp != options.loudnessComp || o.alwaysOn != options.alwaysOn;
@@ -344,12 +344,12 @@ void NamifiedProcessor::setEngineOptions (const EngineOptions& o)
 }
 
 // ---- channel memory ------------------------------------------------------------------------------
-void NamifiedProcessor::parameterChanged (const juce::String& id, float v)
+void NamVXProcessor::parameterChanged (const juce::String& id, float v)
 {
     if (id == pid::channel) { pendingChannel = (int) v; triggerAsyncUpdate(); }
 }
 
-void NamifiedProcessor::handleAsyncUpdate()
+void NamVXProcessor::handleAsyncUpdate()
 {
     const int newCh = pendingChannel.exchange (-1);
     if (newCh < 0 || restoringChannelKnobs) return;
@@ -372,14 +372,14 @@ void NamifiedProcessor::handleAsyncUpdate()
     sendChangeMessage();
 }
 
-void NamifiedProcessor::timerCallback()
+void NamVXProcessor::timerCallback()
 {
     chain.collectGarbage();
     if (getLatencySamples() != chain.getLatencySamples()) setLatencySamples (chain.getLatencySamples());
 }
 
 // ---- state + presets -------------------------------------------------------------------------------
-void NamifiedProcessor::getStateInformation (juce::MemoryBlock& dest)
+void NamVXProcessor::getStateInformation (juce::MemoryBlock& dest)
 {
     auto state = apvts.copyState();
     state.setProperty ("ampId", currentAmpId, nullptr);
@@ -394,7 +394,7 @@ void NamifiedProcessor::getStateInformation (juce::MemoryBlock& dest)
     if (auto xml = state.createXml()) copyXmlToBinary (*xml, dest);
 }
 
-void NamifiedProcessor::setStateInformation (const void* data, int size)
+void NamVXProcessor::setStateInformation (const void* data, int size)
 {
     if (auto xml = getXmlFromBinary (data, size))
     {
@@ -427,7 +427,7 @@ void NamifiedProcessor::setStateInformation (const void* data, int size)
     }
 }
 
-bool NamifiedProcessor::savePreset (const juce::String& name)
+bool NamVXProcessor::savePreset (const juce::String& name)
 {
     juce::MemoryBlock mb;
     getStateInformation (mb);
@@ -440,7 +440,7 @@ bool NamifiedProcessor::savePreset (const juce::String& name)
     return ok;
 }
 
-bool NamifiedProcessor::loadPreset (const juce::File& f)
+bool NamVXProcessor::loadPreset (const juce::File& f)
 {
     auto tree = presets->loadPreset (f);
     if (! tree.isValid()) return false;
@@ -454,6 +454,6 @@ bool NamifiedProcessor::loadPreset (const juce::File& f)
     }
     return false;
 }
-} // namespace namified
+} // namespace namvx
 
-juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new namified::NamifiedProcessor(); }
+juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new namvx::NamVXProcessor(); }

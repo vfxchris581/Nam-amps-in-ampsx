@@ -1,15 +1,15 @@
-# Namified — Intelligent NAM Amplifier
+# Nam VX — Intelligent NAM Amplifier
 
-Namified turns a folder of [Neural Amp Modeler](https://www.neuralampmodeler.com/) captures of **one physical amplifier** into **one playable virtual amplifier** — with real Gain, Volume, Bass, Middle, Treble, Presence, Resonance and Master knobs, real channels, a 12AX7 / power-amp circuit engine, a harmonic engine and a professional dual-IR cabinet.
+Nam VX turns a folder of [Neural Amp Modeler](https://www.neuralampmodeler.com/) captures of **one physical amplifier** into **one playable virtual amplifier** — with real Gain, Volume, Bass, Middle, Treble, Presence, Resonance and Master knobs, real channels, a 12AX7 / power-amp circuit engine, a harmonic engine and a professional dual-IR cabinet.
 
 Standalone app (macOS / Windows) · VST3 (macOS / Windows) · AU (macOS) · C++20 / JUCE 8 · official NAM inference core
 
-![Amp](Documentation/images/namified-amp.png)
+![Amp](Documentation/images/namvx-amp.png)
 
 ## What it does
 
 1. **Drop captures** (files or whole folders) anywhere on the window.
-2. Namified reads every capture's NAM metadata, **groups captures by manufacturer + model** (unrelated amps are never merged; captures with no identity wait for you to name them), finds **channels** from names like `ch2`, `Lead`, `Crunch`, and reads **knob settings** from names like `G7 B4 M6 T8 P5` or `gain=65`.
+2. Nam VX reads every capture's NAM metadata, **groups captures by manufacturer + model** (unrelated amps are never merged; captures with no identity wait for you to name them), finds **channels** from names like `ch2`, `Lead`, `Crunch`, and reads **knob settings** from names like `G7 B4 M6 T8 P5` or `gain=65`.
 3. Each capture is **analysed by listening to it** (latency, polarity, loudness, compression, harmonic content, tonal balance). Where names don't reveal settings but captures clearly differ, settings are **estimated from the sound** (marked `~` so you can confirm or change them).
 4. The amp is saved to your **library** and the interface is generated for it — its name, its channels, its eight controls.
 
@@ -37,14 +37,14 @@ Two independent slots (WAV/AIFF, mono or stereo, 44.1–192 kHz, any length): vo
 
 | Captures (profile manager) | Cabinet |
 |---|---|
-| ![](Documentation/images/namified-captures.png) | ![](Documentation/images/namified-cabinet.png) |
+| ![](Documentation/images/namvx-captures.png) | ![](Documentation/images/namvx-cabinet.png) |
 | **Tube & Harmonics** | **Library & presets** |
-| ![](Documentation/images/namified-tube-harmonics.png) | ![](Documentation/images/namified-library.png) |
+| ![](Documentation/images/namvx-tube-harmonics.png) | ![](Documentation/images/namvx-library.png) |
 
 ## Build
 
 ```bash
-# macOS (universal), produces dist/Namified-macOS.dmg
+# macOS (universal), produces dist/NamVX-macOS.dmg
 BuildScripts/build_macos.sh
 # Windows (Visual Studio 2022)
 powershell -ExecutionPolicy Bypass -File BuildScripts\build_windows.ps1

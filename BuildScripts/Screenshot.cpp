@@ -1,6 +1,6 @@
-// Renders the real Namified editor (every tab) to PNG files with a demo library built from the
+// Renders the real Nam VX editor (every tab) to PNG files with a demo library built from the
 // NeuralAmpModelerCore example models. Used for README/documentation previews and as a UI smoke
-// test.  Usage:  NamifiedScreenshot <output-dir>
+// test.  Usage:  NamVXScreenshot <output-dir>
 
 #include <fstream>
 #include <json.hpp>
@@ -9,16 +9,16 @@
 
 namespace
 {
-using namespace namified;
+using namespace namvx;
 
 void writeDemoCapture (const juce::File& dir, const juce::String& file, const juce::String& name)
 {
-    std::ifstream in (juce::File (NAMIFIED_EXAMPLE_MODELS).getChildFile ("wavenet.nam").getFullPathName().toStdString());
+    std::ifstream in (juce::File (NAMVX_EXAMPLE_MODELS).getChildFile ("wavenet.nam").getFullPathName().toStdString());
     nlohmann::json j; in >> j;
     j["metadata"]["gear_make"] = "Demo Amplification";
     j["metadata"]["gear_model"] = "Lead 100";
     j["metadata"]["name"] = name.toStdString();
-    j["metadata"]["modeled_by"] = "Namified demo";
+    j["metadata"]["modeled_by"] = "Nam VX demo";
     std::ofstream out (dir.getChildFile (file + ".nam").getFullPathName().toStdString());
     out << j.dump();
 }
@@ -56,14 +56,14 @@ juce::File writeDemoIR (const juce::File& dir, const juce::String& name, double 
 class ScreenshotApp : public juce::JUCEApplication, private juce::Timer
 {
 public:
-    const juce::String getApplicationName() override { return "NamifiedScreenshot"; }
+    const juce::String getApplicationName() override { return "NamVXScreenshot"; }
     const juce::String getApplicationVersion() override { return "1.0"; }
 
     void initialise (const juce::String& cmd) override
     {
         outDir = juce::File::getCurrentWorkingDirectory().getChildFile (cmd.isEmpty() ? "screenshots" : cmd.unquoted());
         outDir.createDirectory();
-        auto root = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("namified_screenshot");
+        auto root = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("namvx_screenshot");
         root.deleteRecursively();
         auto caps = root.getChildFile ("captures");
         caps.createDirectory();
@@ -78,7 +78,7 @@ public:
             AmpLibrary lib (root.getChildFile ("Library").getFullPathName().toStdString());
             lib.importFiles ({ caps.getFullPathName().toStdString() });
         }
-        processor = std::make_unique<NamifiedProcessor> (root);
+        processor = std::make_unique<NamVXProcessor> (root);
         processor->loadImpulseResponse (0, writeDemoIR (root, "4x12 V30 SM57 Cap Edge", 48000, 0.35f, 1));
         processor->loadImpulseResponse (1, writeDemoIR (root, "4x12 V30 R121 Cone", 96000, 0.25f, 1, 0.35));
         processor->savePreset ("Crunch Rhythm");
@@ -90,7 +90,7 @@ public:
         setP ("gain", 6.5f); setP ("bass", 5.5f); setP ("middle", 6.0f); setP ("treble", 6.5f);
         setP ("presence", 6.0f); setP ("resonance", 4.5f); setP ("volume", 6.0f); setP ("master", 4.0f);
         setP (pid::harmOn, 1.0f); setP (pid::cabOn, 1.0f);
-        editor.reset (dynamic_cast<NamifiedEditor*> (processor->createEditor()));
+        editor.reset (dynamic_cast<NamVXEditor*> (processor->createEditor()));
         processor->setPlayConfigDetails (2, 2, 48000.0, 512);
         processor->prepareToPlay (48000.0, 512);
         startTimer (3000); // let the background runtime build finish and the UI settle
@@ -126,9 +126,9 @@ public:
         for (int t = 0; t < 5; ++t)
         {
             editor->showTab (t);
-            editor->setSize (NamifiedEditor::kWidth, NamifiedEditor::kHeight);
+            editor->setSize (NamVXEditor::kWidth, NamVXEditor::kHeight);
             auto img = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.5f);
-            auto f = outDir.getChildFile (juce::String ("namified-") + names[t] + ".png");
+            auto f = outDir.getChildFile (juce::String ("namvx-") + names[t] + ".png");
             f.deleteFile();
             juce::PNGImageFormat png;
             if (auto os = f.createOutputStream()) png.writeImageToStream (img, *os);
@@ -158,8 +158,8 @@ public:
 private:
     juce::File outDir;
     int phase = 0;
-    std::unique_ptr<NamifiedProcessor> processor;
-    std::unique_ptr<NamifiedEditor> editor;
+    std::unique_ptr<NamVXProcessor> processor;
+    std::unique_ptr<NamVXEditor> editor;
 };
 
 START_JUCE_APPLICATION (ScreenshotApp)

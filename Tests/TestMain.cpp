@@ -1,4 +1,4 @@
-// Namified automated tests: metadata, grouping, channels, interpolation, NAM inference,
+// Nam VX automated tests: metadata, grouping, channels, interpolation, NAM inference,
 // resampling, analysis, tube DSP, harmonic engine, oversampling/aliasing, dual IR,
 // end-to-end signal chain (controls really change the sound), click-free switching, presets.
 
@@ -25,13 +25,13 @@
 #include "AudioEngine/SignalChain.h"
 
 namespace fs = std::filesystem;
-using namespace namified;
+using namespace namvx;
 
-static fs::path examples() { return fs::path (NAMIFIED_EXAMPLE_MODELS); }
+static fs::path examples() { return fs::path (NAMVX_EXAMPLE_MODELS); }
 
 static fs::path tempDir (const std::string& name)
 {
-    auto d = fs::temp_directory_path() / ("namified_tests_" + name);
+    auto d = fs::temp_directory_path() / ("namvx_tests_" + name);
     fs::remove_all (d);
     fs::create_directories (d);
     return d;

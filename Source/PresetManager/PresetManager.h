@@ -3,7 +3,7 @@
 
 #include <juce_data_structures/juce_data_structures.h>
 
-namespace namified
+namespace namvx
 {
 class PresetManager
 {
@@ -27,10 +27,10 @@ public:
     bool loadCabPreset (const juce::File& f, CabPreset& out) const;
 
     static juce::String sanitise (const juce::String& name);
-    static constexpr const char* kPresetExt = ".namified";
+    static constexpr const char* kPresetExt = ".namvx";
     static constexpr const char* kCabExt = ".namcab";
 
 private:
     juce::File dir, cabDir;
 };
-} // namespace namified
+} // namespace namvx

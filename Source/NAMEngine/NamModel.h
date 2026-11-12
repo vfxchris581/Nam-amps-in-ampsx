@@ -12,7 +12,7 @@
 
 namespace nam { class DSP; }
 
-namespace namified
+namespace namvx
 {
 class NamModel
 {
@@ -54,4 +54,4 @@ private:
     SampleFifo modelIn, hostOut;
     std::vector<double> scratchIn, scratchOut;
 };
-} // namespace namified
+} // namespace namvx

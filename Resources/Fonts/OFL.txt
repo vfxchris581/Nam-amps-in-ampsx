@@ -1,4 +1,4 @@
-Fonts bundled with Namified
+Fonts bundled with Nam VX
 ===========================
 
 Inter (Inter-Regular.otf, Inter-SemiBold.otf)

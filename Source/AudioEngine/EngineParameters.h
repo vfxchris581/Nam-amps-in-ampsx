@@ -7,7 +7,7 @@
 #include "NAMMetadata/CaptureMetadata.h"
 #include "HarmonicEngine/HarmonicEngine.h"
 
-namespace namified
+namespace namvx
 {
 struct SlotParams
 {
@@ -91,4 +91,4 @@ namespace pid
     inline const char* ir2Invert = "ir2Invert";
     inline const char* ir2Delay = "ir2Delay";
 } // namespace pid
-} // namespace namified
+} // namespace namvx

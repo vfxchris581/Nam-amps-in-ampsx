@@ -1,8 +1,8 @@
 #include "PluginEditor.h"
 
-namespace namified
+namespace namvx
 {
-NamifiedEditor::NamifiedEditor (NamifiedProcessor& p)
+NamVXEditor::NamVXEditor (NamVXProcessor& p)
     : AudioProcessorEditor (p), proc (p),
       ampPanel (p), capturesPanel (p), cabinetPanel (p), tubePanel (p), libraryPanel (p)
 {
@@ -62,15 +62,15 @@ NamifiedEditor::NamifiedEditor (NamifiedProcessor& p)
     refreshAll();
 }
 
-NamifiedEditor::~NamifiedEditor()
+NamVXEditor::~NamVXEditor()
 {
     proc.removeChangeListener (this);
     setLookAndFeel (nullptr);
 }
 
-void NamifiedEditor::changeListenerCallback (juce::ChangeBroadcaster*) { refreshAll(); }
+void NamVXEditor::changeListenerCallback (juce::ChangeBroadcaster*) { refreshAll(); }
 
-void NamifiedEditor::refreshAll()
+void NamVXEditor::refreshAll()
 {
     ampSelector.clear (juce::dontSendNotification);
     int id = 1, sel = 0;
@@ -99,12 +99,12 @@ void NamifiedEditor::refreshAll()
     libraryPanel.refresh();
 }
 
-void NamifiedEditor::paint (juce::Graphics& g)
+void NamVXEditor::paint (juce::Graphics& g)
 {
     g.fillAll (ui::bg);
 }
 
-void NamifiedEditor::paintOverChildren (juce::Graphics& g)
+void NamVXEditor::paintOverChildren (juce::Graphics& g)
 {
     // header (drawn in the scaled content's coordinate space)
     const float s = (float) getWidth() / kWidth;
@@ -112,11 +112,13 @@ void NamifiedEditor::paintOverChildren (juce::Graphics& g)
     g.addTransform (juce::AffineTransform::scale (s));
     auto logo = juce::Rectangle<float> (24, 14, 260, 40);
     g.setColour (ui::gold);
-    g.setFont (ui::brand (28.0f).withExtraKerningFactor (0.04f));
-    g.drawText ("Namified", logo, juce::Justification::centredLeft);
+    const auto logoFont = ui::brand (28.0f).withExtraKerningFactor (0.04f);
+    g.setFont (logoFont);
+    g.drawText ("Nam VX", logo, juce::Justification::centredLeft);
+    const float logoW = juce::GlyphArrangement::getStringWidth (logoFont, "Nam VX");
     g.setColour (ui::textDim);
     g.setFont (ui::semi (9.5f).withExtraKerningFactor (0.3f));
-    g.drawText ("INTELLIGENT NAM AMPLIFIER", logo.translated (148, 2), juce::Justification::centredLeft);
+    g.drawText ("INTELLIGENT NAM AMPLIFIER", logo.translated (logoW + 18.0f, 2), juce::Justification::centredLeft);
 
     if (dragging)
     {
@@ -130,7 +132,7 @@ void NamifiedEditor::paintOverChildren (juce::Graphics& g)
     }
 }
 
-void NamifiedEditor::resized()
+void NamVXEditor::resized()
 {
     content.setBounds (0, 0, kWidth, kHeight);
     content.setTransform (juce::AffineTransform::scale ((float) getWidth() / kWidth));
@@ -149,7 +151,7 @@ void NamifiedEditor::resized()
     tabs.setBounds (r);
 }
 
-bool NamifiedEditor::isInterestedInFileDrag (const juce::StringArray& files)
+bool NamVXEditor::isInterestedInFileDrag (const juce::StringArray& files)
 {
     for (auto& f : files)
     {
@@ -159,7 +161,7 @@ bool NamifiedEditor::isInterestedInFileDrag (const juce::StringArray& files)
     return false;
 }
 
-void NamifiedEditor::filesDropped (const juce::StringArray& files, int, int)
+void NamVXEditor::filesDropped (const juce::StringArray& files, int, int)
 {
     dragging = false;
     juce::StringArray nams;
@@ -183,4 +185,4 @@ void NamifiedEditor::filesDropped (const juce::StringArray& files, int, int)
     }
     repaint();
 }
-} // namespace namified
+} // namespace namvx

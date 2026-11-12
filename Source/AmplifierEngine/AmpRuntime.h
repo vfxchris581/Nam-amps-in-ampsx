@@ -9,7 +9,7 @@
 #include "ToneResidual.h"
 #include "ProfileInterpolation/CaptureBlender.h"
 
-namespace namified
+namespace namvx
 {
 struct RuntimeOptions
 {
@@ -53,4 +53,4 @@ private:
     std::string ampId;
     int latency = 0;
 };
-} // namespace namified
+} // namespace namvx

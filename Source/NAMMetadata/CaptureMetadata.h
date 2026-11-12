@@ -7,9 +7,9 @@
 #include <string>
 #include <filesystem>
 
-namespace namified
+namespace namvx
 {
-/** The eight amplifier controls Namified builds for every virtual amp. */
+/** The eight amplifier controls Nam VX builds for every virtual amp. */
 enum class Control : int { Gain = 0, Volume, Bass, Middle, Treble, Presence, Resonance, Master, Count };
 constexpr int kNumControls = (int) Control::Count;
 const char* controlName (Control c) noexcept;
@@ -63,4 +63,4 @@ void parseSettingsFromText (const std::string& text, CaptureMetadata& meta);
 
 /** Exposed for testing: guess make/model from a capture name with settings tokens removed. */
 void guessIdentityFromText (const std::string& text, CaptureMetadata& meta);
-} // namespace namified
+} // namespace namvx

@@ -1,6 +1,6 @@
 #include "IRSlot.h"
 
-namespace namified
+namespace namvx
 {
 IRSlot::IRSlot() = default;
 
@@ -124,4 +124,4 @@ void IRSlot::process (const float* monoIn, juce::AudioBuffer<float>& out, int n)
         orr[i] = delay.popSample (1) * gainR.getNextValue();
     }
 }
-} // namespace namified
+} // namespace namvx

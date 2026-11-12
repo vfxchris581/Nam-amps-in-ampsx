@@ -1,6 +1,6 @@
 #include "PowerAmpStage.h"
 
-namespace namified
+namespace namvx
 {
 double KorenPentode::plateCurrent (double vg1, double vg2) const noexcept
 {
@@ -128,4 +128,4 @@ double PowerAmpStage::process (double x) noexcept
     y = spkHigh.process (spkLow.process (y));
     return dc.process (y);
 }
-} // namespace namified
+} // namespace namvx

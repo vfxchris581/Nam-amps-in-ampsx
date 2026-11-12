@@ -1,6 +1,6 @@
 #include "ToneResidual.h"
 
-namespace namified
+namespace namvx
 {
 double ToneResidual::levelTaper (double knob) noexcept
 {
@@ -65,4 +65,4 @@ void ToneResidual::process (double* x, int n) noexcept
         }
     }
 }
-} // namespace namified
+} // namespace namvx

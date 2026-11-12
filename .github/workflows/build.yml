@@ -41,7 +41,7 @@ jobs:
         shell: bash
         run: |
           EXTRA=""
-          if [ "$RUNNER_OS" == "Linux" ]; then EXTRA="-G Ninja -DNAMIFIED_BUILD_SCREENSHOT=ON"; fi
+          if [ "$RUNNER_OS" == "Linux" ]; then EXTRA="-G Ninja -DNAMVX_BUILD_SCREENSHOT=ON"; fi
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release $EXTRA
 
       - name: Build
@@ -55,7 +55,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           xvfb-run -a -s "-screen 0 1920x1200x24" \
-            build/Source/Plugin/NamifiedScreenshot_artefacts/Release/NamifiedScreenshot screenshots
+            build/Source/Plugin/NamVXScreenshot_artefacts/Release/NamVXScreenshot screenshots
 
       - name: Package macOS (DMG)
         if: runner.os == 'macOS'
@@ -65,27 +65,27 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $art = "build/Source/Plugin/Namified_artefacts/Release"
-          New-Item -ItemType Directory -Force -Path dist/Namified | Out-Null
-          Copy-Item -Recurse "$art/VST3/Namified.vst3" dist/Namified/
-          Copy-Item "$art/Standalone/Namified.exe" dist/Namified/
-          Copy-Item Documentation/INSTALL.md dist/Namified/
-          Compress-Archive -Path dist/Namified/* -DestinationPath dist/Namified-Windows.zip
+          $art = "build/Source/Plugin/NamVX_artefacts/Release"
+          New-Item -ItemType Directory -Force -Path dist/NamVX | Out-Null
+          Copy-Item -Recurse "$art/VST3/Nam VX.vst3" dist/NamVX/
+          Copy-Item "$art/Standalone/Nam VX.exe" dist/NamVX/
+          Copy-Item Documentation/INSTALL.md dist/NamVX/
+          Compress-Archive -Path dist/NamVX/* -DestinationPath dist/NamVX-Windows.zip
 
       - uses: actions/upload-artifact@v4
         if: runner.os == 'macOS'
         with:
-          name: Namified-macOS
+          name: NamVX-macOS
           path: dist/*.dmg
 
       - uses: actions/upload-artifact@v4
         if: runner.os == 'Windows'
         with:
-          name: Namified-Windows
-          path: dist/Namified-Windows.zip
+          name: NamVX-Windows
+          path: dist/NamVX-Windows.zip
 
       - uses: actions/upload-artifact@v4
         if: runner.os == 'Linux'
         with:
-          name: Namified-screenshots
+          name: NamVX-screenshots
           path: screenshots/*.png

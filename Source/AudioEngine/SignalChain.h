@@ -1,5 +1,5 @@
 #pragma once
-// The complete Namified signal path:
+// The complete Nam VX signal path:
 //
 //  in → input gain → [OS] 12AX7 stage [/OS] → gain residual → NAM capture blend (channel xfade)
 //     → make-up · volume → tone residual EQ → [OS] harmonic engine → power amp (master) [/OS]
@@ -20,7 +20,7 @@
 #include "HarmonicEngine/HarmonicEngine.h"
 #include "Convolution/DualCabinet.h"
 
-namespace namified
+namespace namvx
 {
 class SignalChain
 {
@@ -92,4 +92,4 @@ private:
     std::atomic<int> latency { 0 };
     int runtimeLatency = 0;
 };
-} // namespace namified
+} // namespace namvx

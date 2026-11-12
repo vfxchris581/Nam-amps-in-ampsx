@@ -1,7 +1,7 @@
-#include "NamifiedLookAndFeel.h"
+#include "NamVXLookAndFeel.h"
 #include "BinaryData.h"
 
-namespace namified
+namespace namvx
 {
 namespace ui
 {
@@ -115,7 +115,7 @@ void drawLed (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour c, bool 
 }
 } // namespace ui
 
-NamifiedLookAndFeel::NamifiedLookAndFeel()
+NamVXLookAndFeel::NamVXLookAndFeel()
 {
     setColour (juce::ResizableWindow::backgroundColourId, ui::bg);
     setColour (juce::Label::textColourId, ui::text);
@@ -145,14 +145,14 @@ NamifiedLookAndFeel::NamifiedLookAndFeel()
     setColour (juce::AlertWindow::textColourId, ui::text);
 }
 
-juce::Typeface::Ptr NamifiedLookAndFeel::getTypefaceForFont (const juce::Font& f)
+juce::Typeface::Ptr NamVXLookAndFeel::getTypefaceForFont (const juce::Font& f)
 {
     if (f.getTypefaceName() == juce::Font::getDefaultSansSerifFontName() || f.getTypefaceName() == "<Sans-Serif>")
         return f.isBold() ? ui::tfSemi() : ui::tfRegular();
     return LookAndFeel_V4::getTypefaceForFont (f);
 }
 
-void NamifiedLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w, int h, float pos, float start,
+void NamVXLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w, int h, float pos, float start,
                                              float end, juce::Slider& s)
 {
     const bool onPlate = (bool) s.getProperties().getWithDefault ("faceplate", false);
@@ -226,7 +226,7 @@ void NamifiedLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int
                 c.x + pr2 * std::sin (angle), c.y - pr2 * std::cos (angle), 0.8f);
 }
 
-void NamifiedLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& b, bool highlighted, bool)
+void NamVXLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& b, bool highlighted, bool)
 {
     auto r = b.getLocalBounds().toFloat();
     const bool on = b.getToggleState();
@@ -238,7 +238,7 @@ void NamifiedLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButto
     g.drawText (b.getButtonText(), r.withTrimmedLeft (4), juce::Justification::centredLeft);
 }
 
-void NamifiedLookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& b, const juce::Colour&, bool highlighted, bool down)
+void NamVXLookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& b, const juce::Colour&, bool highlighted, bool down)
 {
     auto r = b.getLocalBounds().toFloat().reduced (0.5f);
     const bool on = b.getToggleState();
@@ -267,7 +267,7 @@ void NamifiedLookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button&
     g.drawRoundedRectangle (r, 5.0f, 1.0f);
 }
 
-void NamifiedLookAndFeel::drawComboBox (juce::Graphics& g, int w, int h, bool, int, int, int, int, juce::ComboBox& box)
+void NamVXLookAndFeel::drawComboBox (juce::Graphics& g, int w, int h, bool, int, int, int, int, juce::ComboBox& box)
 {
     auto r = juce::Rectangle<float> (0, 0, (float) w, (float) h).reduced (0.5f);
     g.setColour (box.findColour (juce::ComboBox::backgroundColourId));
@@ -281,7 +281,7 @@ void NamifiedLookAndFeel::drawComboBox (juce::Graphics& g, int w, int h, bool, i
     g.fillPath (arrow);
 }
 
-void NamifiedLookAndFeel::drawTabButton (juce::TabBarButton& b, juce::Graphics& g, bool over, bool)
+void NamVXLookAndFeel::drawTabButton (juce::TabBarButton& b, juce::Graphics& g, bool over, bool)
 {
     auto r = b.getLocalBounds().toFloat();
     const bool front = b.isFrontTab();
@@ -295,7 +295,7 @@ void NamifiedLookAndFeel::drawTabButton (juce::TabBarButton& b, juce::Graphics& 
     }
 }
 
-void NamifiedLookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, int w, int h, float pos, float, float,
+void NamVXLookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, int w, int h, float pos, float, float,
                                              juce::Slider::SliderStyle style, juce::Slider& s)
 {
     if (style != juce::Slider::LinearHorizontal) { LookAndFeel_V4::drawLinearSlider (g, x, y, w, h, pos, 0, 0, style, s); return; }
@@ -307,4 +307,4 @@ void NamifiedLookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, int
     g.setColour (ui::text);
     g.fillEllipse (pos - 7, cy - 7, 14, 14);
 }
-} // namespace namified
+} // namespace namvx

@@ -8,7 +8,7 @@
 
 namespace fs = std::filesystem;
 
-namespace namified
+namespace namvx
 {
 AmpLibrary::AmpLibrary (fs::path rootDir) : root (std::move (rootDir))
 {
@@ -196,4 +196,4 @@ std::string AmpLibrary::assignPending (const PendingCapture& p, const std::strin
     writeAmp (amp);
     return amp.id;
 }
-} // namespace namified
+} // namespace namvx

@@ -9,7 +9,7 @@
 #include <vector>
 #include <json.hpp>
 
-namespace namified
+namespace namvx
 {
 const char* controlName (Control c) noexcept
 {
@@ -269,4 +269,4 @@ CaptureMetadata readCaptureMetadata (const std::filesystem::path& file)
     if (! m.identityFromMetadata) guessIdentityFromText (m.name, m);
     return m;
 }
-} // namespace namified
+} // namespace namvx

@@ -4,7 +4,7 @@
 #include <NAM/dsp.h>
 #include <NAM/get_dsp.h>
 
-namespace namified
+namespace namvx
 {
 NamModel::NamModel() = default;
 NamModel::~NamModel() = default;
@@ -100,4 +100,4 @@ double NamModel::getInputLevelDbu() const noexcept
 {
     return hasInputLevel() ? const_cast<nam::DSP&> (*dsp).GetInputLevel() : 12.2;
 }
-} // namespace namified
+} // namespace namvx

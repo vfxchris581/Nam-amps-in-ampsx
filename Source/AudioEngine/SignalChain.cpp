@@ -1,6 +1,6 @@
 #include "SignalChain.h"
 
-namespace namified
+namespace namvx
 {
 SignalChain::SignalChain() = default;
 SignalChain::~SignalChain() = default;
@@ -275,4 +275,4 @@ void SignalChain::processMono (double* x, int n) noexcept
     }
     outputPeak = std::max (opk, outputPeak.load() * 0.9f);
 }
-} // namespace namified
+} // namespace namvx

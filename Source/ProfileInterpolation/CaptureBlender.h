@@ -14,7 +14,7 @@
 #include "ProfileInterpolator.h"
 #include "AudioEngine/DspCommon.h"
 
-namespace namified
+namespace namvx
 {
 struct BlendSource
 {
@@ -54,4 +54,4 @@ private:
     int holdSamples = 0, reportedLatency = 0, running = 0;
     bool alwaysOn = false;
 };
-} // namespace namified
+} // namespace namvx

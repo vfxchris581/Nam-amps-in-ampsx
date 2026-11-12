@@ -8,7 +8,7 @@
 #include "NAMEngine/NamModel.h"
 #include "NAMMetadata/CaptureMetadata.h"
 
-namespace namified
+namespace namvx
 {
 struct CaptureAnalysis
 {
@@ -39,4 +39,4 @@ public:
     /** Tone feature associated with a control (used by estimateCoordinates and tests). */
     static double featureFor (Control c, const CaptureAnalysis& a) noexcept;
 };
-} // namespace namified
+} // namespace namvx

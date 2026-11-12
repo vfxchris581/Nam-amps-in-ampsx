@@ -1,7 +1,7 @@
 #include "CapturesPanel.h"
 #include "ChannelManager/ChannelManager.h"
 
-namespace namified
+namespace namvx
 {
 class CapturesPanel::EditableCell : public juce::Label
 {
@@ -29,7 +29,7 @@ private:
     CapturesPanel& owner;
 };
 
-CapturesPanel::CapturesPanel (NamifiedProcessor& p) : proc (p)
+CapturesPanel::CapturesPanel (NamVXProcessor& p) : proc (p)
 {
     auto& h = table.getHeader();
     h.addColumn ("Capture", colName, 230, 120, 600);
@@ -272,4 +272,4 @@ void CapturesPanel::cellEdited (int row, int col, const juce::String& text)
     markDirty();
     refresh();
 }
-} // namespace namified
+} // namespace namvx

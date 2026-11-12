@@ -1,6 +1,6 @@
 #include "DualCabinet.h"
 
-namespace namified
+namespace namvx
 {
 void DualCabinet::prepare (const juce::dsp::ProcessSpec& spec)
 {
@@ -107,4 +107,4 @@ void DualCabinet::updateAlignment()
     align1 = alignment.slot1DelayMs;
     align2 = alignment.slot2DelayMs;
 }
-} // namespace namified
+} // namespace namvx

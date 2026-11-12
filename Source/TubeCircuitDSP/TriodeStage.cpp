@@ -1,6 +1,6 @@
 #include "TriodeStage.h"
 
-namespace namified
+namespace namvx
 {
 double KorenTriode::plateCurrent (double vgk, double vpk) const noexcept
 {
@@ -108,4 +108,4 @@ double TriodeStage::process (double x) noexcept
     const double y = -(vp - vp0) / (smallSignalGain * inScale);
     return dc.process (y);
 }
-} // namespace namified
+} // namespace namvx

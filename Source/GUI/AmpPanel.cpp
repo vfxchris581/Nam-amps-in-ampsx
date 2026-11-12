@@ -1,9 +1,9 @@
 #include "AmpPanel.h"
 #include <set>
 
-namespace namified
+namespace namvx
 {
-AmpPanel::AmpPanel (NamifiedProcessor& p)
+AmpPanel::AmpPanel (NamVXProcessor& p)
     : proc (p),
       input (p.getAPVTS(), pid::input, "Input"), output (p.getAPVTS(), pid::output, "Output"),
       tube (p.getAPVTS(), pid::preTubeOn, "12AX7 Stage"), power (p.getAPVTS(), pid::powerAmpOn, "Power Amp"),
@@ -170,4 +170,4 @@ void AmpPanel::timerCallback()
         channelButtons[i]->setToggleState (i == proc.getCurrentChannel(), juce::dontSendNotification);
     repaint (plateBounds().withWidth (120).withX (plateBounds().getRight() - 120).withHeight (90));
 }
-} // namespace namified
+} // namespace namvx
