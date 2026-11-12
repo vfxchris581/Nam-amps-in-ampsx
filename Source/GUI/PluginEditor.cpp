@@ -164,25 +164,55 @@ bool NamVXEditor::isInterestedInFileDrag (const juce::StringArray& files)
 void NamVXEditor::filesDropped (const juce::StringArray& files, int, int)
 {
     dragging = false;
-    juce::StringArray nams;
-    int irSlot = proc.getChain().getCabinet().slot (0).isLoaded() ? 1 : 0;
+    juce::StringArray nams, errors;
+    juce::Array<juce::File> irs;
+    const juce::String audioExt ("*.wav;*.WAV;*.wave;*.aif;*.AIF;*.aiff;*.AIFF");
+
     for (auto& f : files)
     {
         const juce::File file (f);
-        if (file.hasFileExtension ("wav;aif;aiff"))
+        if (file.isDirectory())
         {
-            proc.loadImpulseResponse (irSlot, file);
-            irSlot = 1;
-            tabs.setCurrentTabIndex (2);
+            // A folder can hold NAM captures, impulse responses, or both.
+            const auto namFiles = file.findChildFiles (juce::File::findFiles, true, "*.nam;*.NAM");
+            if (! namFiles.isEmpty()) nams.add (f);
+            if (namFiles.isEmpty())
+            {
+                auto audio = file.findChildFiles (juce::File::findFiles, true, audioExt);
+                audio.sort();
+                for (auto& a : audio) irs.add (a);
+            }
         }
+        else if (file.hasFileExtension ("wav;wave;aif;aiff"))
+            irs.add (file);
         else
             nams.add (f);
+    }
+
+    if (! irs.isEmpty())
+    {
+        int slot = proc.getChain().getCabinet().slot (0).isLoaded() ? 1 : 0;
+        int loaded = 0;
+        for (auto& ir : irs)
+        {
+            if (loaded == 2) break;
+            const auto err = proc.loadImpulseResponse (slot, ir);
+            if (err.isNotEmpty()) { errors.add (err); continue; }
+            ++loaded;
+            slot = 1 - slot;
+        }
+        if (irs.size() > 2)
+            errors.add ("Dropped " + juce::String (irs.size()) + " impulse responses: the first " + juce::String (loaded)
+                        + " were loaded. Use Load IR... on the Cabinet page to pick others.");
+        tabs.setCurrentTabIndex (2);
     }
     if (! nams.isEmpty())
     {
         proc.importFiles (nams);
         tabs.setCurrentTabIndex (0);
     }
+    if (! errors.isEmpty())
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "Impulse responses", errors.joinIntoString ("\n\n"));
     repaint();
 }
 } // namespace namvx

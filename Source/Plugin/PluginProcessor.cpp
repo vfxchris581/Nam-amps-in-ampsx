@@ -313,7 +313,10 @@ juce::String NamVXProcessor::loadImpulseResponse (int slot, const juce::File& f)
     {
         irPaths[slot] = f.getFullPathName();
         chain.getCabinet().updateAlignment();
+        setStatus ("IR " + juce::String (slot + 1) + ": " + f.getFileNameWithoutExtension());
     }
+    else
+        setStatus (err);
     sendChangeMessage();
     return err;
 }

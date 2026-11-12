@@ -445,6 +445,52 @@ TEST (dual_ir_identity_polarity_delay_and_blend)
     CHECK (std::abs (al.slot1DelayMs - 0.5f) < 0.03f && al.slot2DelayMs == 0.0f);
 }
 
+TEST (ir_files_load_from_disk)
+{
+    // Real files through the same path the Load button / drag & drop use.
+    const auto dir = tempDir ("irfiles");
+    struct Fmt { const char* name; int bits; bool aiff; int chans; double sr; bool flt; };
+    const Fmt fmts[] = { { "mono16.wav", 16, false, 1, 44100, false }, { "mono24.wav", 24, false, 1, 48000, false },
+                         { "stereo24_96k.wav", 24, false, 2, 96000, false }, { "float32.wav", 32, false, 1, 48000, true },
+                         { "UPPER.WAV", 24, false, 1, 48000, false }, { "mono24.aif", 24, true, 1, 48000, false },
+                         { "long_5s.wav", 24, false, 1, 48000, false } };
+    for (const auto& f : fmts)
+    {
+        const juce::File file (juce::String ((dir / f.name).string()));
+        const int len = juce::String (f.name).startsWith ("long") ? (int) (f.sr * 5) : (int) (f.sr * 0.1);
+        juce::AudioBuffer<float> ir (f.chans, len);
+        ir.clear();
+        for (int ch = 0; ch < f.chans; ++ch)
+            for (int i = 0; i < std::min (len, 2000); ++i) ir.setSample (ch, i, (float) (std::exp (-i / 200.0) * std::cos (i * 0.3)));
+        {
+            std::unique_ptr<juce::AudioFormat> fmt;
+            if (f.aiff) fmt = std::make_unique<juce::AiffAudioFormat>(); else fmt = std::make_unique<juce::WavAudioFormat>();
+            std::unique_ptr<juce::OutputStream> os (file.createOutputStream());
+            CHECK (os != nullptr);
+            juce::StringPairArray meta;
+            auto* w = fmt->createWriterFor (os.get(), f.sr, (unsigned) f.chans, f.bits, meta, 0);
+            CHECK (w != nullptr);
+            if (w == nullptr) continue;
+            os.release();
+            std::unique_ptr<juce::AudioFormatWriter> writer (w);
+            writer->writeFromAudioSampleBuffer (ir, 0, len);
+        }
+        DualCabinet cab;
+        cab.prepare ({ 48000, 512, 2 });
+        const auto err = cab.slot (0).loadFile (file);
+        CHECK_MSG (err.isEmpty(), "%s: %s", f.name, err.toRawUTF8());
+        CHECK_MSG (cab.slot (0).isLoaded(), "%s not loaded", f.name);
+        DualCabinet::Global g; g.blend = 0.0f; cab.setGlobal (g);
+        waitForConvolution (cab, 48000);
+        std::vector<float> x (512, 0.0f); x[0] = 1.0f;
+        juce::AudioBuffer<float> out (2, 512);
+        cab.process (x.data(), out, 512);
+        const float e = out.getMagnitude (0, 0, 512);
+        CHECK_MSG (e > 1e-3f, "%s produced silence", f.name);
+        INFO ("%-18s %d ch %6.0f Hz -> %s", f.name, f.chans, f.sr, err.isEmpty() ? "loaded" : err.toRawUTF8());
+    }
+}
+
 TEST (ir_level_independent_of_ir_sample_rate)
 {
     // same "cabinet" (decaying noise) stored at 44.1 and 96 kHz → same loudness after loading

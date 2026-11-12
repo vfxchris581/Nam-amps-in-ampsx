@@ -32,7 +32,9 @@ CabinetPanel::CabinetPanel (NamVXProcessor& p)
                                     (juce::Component*) &s->clear, (juce::Component*) &s->file, (juce::Component*) &s->info })
             addAndMakeVisible (c);
         s->load.onClick = [this, idx] {
-            chooser = std::make_unique<juce::FileChooser> ("Load cabinet IR", juce::File(), "*.wav;*.aif;*.aiff");
+            const juce::File current (proc.getIRPath (idx));
+            chooser = std::make_unique<juce::FileChooser> ("Load cabinet IR", current.existsAsFile() ? current.getParentDirectory() : juce::File(),
+                                                           "*.wav;*.WAV;*.wave;*.aif;*.AIF;*.aiff;*.AIFF");
             chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                                   [this, idx] (const juce::FileChooser& fc) {
                                       if (fc.getResult().existsAsFile())
