@@ -1,0 +1,91 @@
+name: Build & Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS
+            os: macos-14
+          - name: Windows
+            os: windows-latest
+          - name: Linux
+            os: ubuntu-24.04
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev \
+            libxext-dev libfreetype6-dev libfontconfig1-dev libgl1-mesa-dev xvfb ninja-build
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
+
+      - name: Configure
+        shell: bash
+        run: |
+          EXTRA=""
+          if [ "$RUNNER_OS" == "Linux" ]; then EXTRA="-G Ninja -DNAMIFIED_BUILD_SCREENSHOT=ON"; fi
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release $EXTRA
+
+      - name: Build
+        run: cmake --build build --config Release --parallel 4
+
+      - name: Test
+        working-directory: build
+        run: ctest -C Release --output-on-failure
+
+      - name: UI screenshots
+        if: runner.os == 'Linux'
+        run: |
+          xvfb-run -a -s "-screen 0 1920x1200x24" \
+            build/Source/Plugin/NamifiedScreenshot_artefacts/Release/NamifiedScreenshot screenshots
+
+      - name: Package macOS (DMG)
+        if: runner.os == 'macOS'
+        run: bash BuildScripts/make_dmg.sh build
+
+      - name: Package Windows (zip)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $art = "build/Source/Plugin/Namified_artefacts/Release"
+          New-Item -ItemType Directory -Force -Path dist/Namified | Out-Null
+          Copy-Item -Recurse "$art/VST3/Namified.vst3" dist/Namified/
+          Copy-Item "$art/Standalone/Namified.exe" dist/Namified/
+          Copy-Item Documentation/INSTALL.md dist/Namified/
+          Compress-Archive -Path dist/Namified/* -DestinationPath dist/Namified-Windows.zip
+
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'macOS'
+        with:
+          name: Namified-macOS
+          path: dist/*.dmg
+
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows'
+        with:
+          name: Namified-Windows
+          path: dist/Namified-Windows.zip
+
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Linux'
+        with:
+          name: Namified-screenshots
+          path: screenshots/*.png
