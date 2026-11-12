@@ -9,6 +9,7 @@ std::unique_ptr<AmpRuntime> AmpRuntime::build (const AmpDefinition& def, double 
 {
     auto rt = std::make_unique<AmpRuntime>();
     rt->ampId = def.id;
+    rt->blend = def.isBlend;
     rt->channels.resize (def.channels.size());
 
     for (size_t ci = 0; ci < def.channels.size(); ++ci)
@@ -35,6 +36,8 @@ std::unique_ptr<AmpRuntime> AmpRuntime::build (const AmpDefinition& def, double 
             catch (const std::exception& e) { errors.push_back (e.what()); }
         }
 
+        if (def.isBlend)
+            for (auto& k : coords) k = unknownCoords(); // blends: no knob mapping, every knob is DSP
         ch.interp.setCaptures (coords, enabled);
         ch.interp.setMaxActive (opts.maxActiveCaptures);
 
@@ -82,6 +85,7 @@ std::unique_ptr<AmpRuntime> AmpRuntime::build (const AmpDefinition& def, double 
     for (size_t ci = 0; ci < def.channels.size(); ++ci)
     {
         rt->setKnobs ((int) ci, def.channels[ci].savedKnobs);
+        if (rt->blend) rt->setBlendLevels ((int) ci, { 1.0, 1.0, 1.0, 1.0 });
         rt->channels[ci].blender.snapToTargets();
     }
     return rt;
@@ -92,6 +96,17 @@ ResidualAmounts AmpRuntime::setKnobs (int channel, const KnobCoords& k) noexcept
     ResidualAmounts r;
     if (channel < 0 || channel >= (int) channels.size()) return r;
     auto& ch = channels[(size_t) channel];
+    if (blend)
+    {
+        // Blend weights come from the Mix knobs; every amp knob acts through the DSP stages.
+        r.gain = k[(size_t) Control::Gain] - 5.0;
+        r.bass = k[(size_t) Control::Bass] - 5.0;
+        r.middle = k[(size_t) Control::Middle] - 5.0;
+        r.treble = k[(size_t) Control::Treble] - 5.0;
+        r.presence = k[(size_t) Control::Presence] - 5.0;
+        r.resonance = k[(size_t) Control::Resonance] - 5.0;
+        return r;
+    }
     const auto res = ch.interp.compute (k);
     ch.blender.setTargets (res);
 
@@ -120,6 +135,25 @@ void AmpRuntime::process (int channel, const double* in, double* out, int n) noe
     ch.blender.process (in, out, n);
     if (ch.pad.getDelay() > 0)
         for (int i = 0; i < n; ++i) out[i] = ch.pad.process (out[i]);
+}
+
+void AmpRuntime::setBlendLevels (int channel, const std::array<double, AmpDefinition::kMaxBlendModels>& levels) noexcept
+{
+    if (! blend || channel < 0 || channel >= (int) channels.size()) return;
+    auto& ch = channels[(size_t) channel];
+    InterpolationResult r;
+    const int n = std::min (ch.blender.numSources(), AmpDefinition::kMaxBlendModels);
+    double sum = 0.0;
+    for (int i = 0; i < n; ++i) sum += std::max (0.0, levels[(size_t) i]);
+    for (int i = 0; i < n; ++i)
+    {
+        const double w = std::max (0.0, levels[(size_t) i]);
+        if (w <= 0.0 || sum <= 0.0) continue;
+        r.index[(size_t) r.numActive] = i;
+        r.weight[(size_t) r.numActive] = w / sum; // normalised: the blend keeps a constant level
+        ++r.numActive;
+    }
+    ch.blender.setTargets (r);
 }
 
 bool AmpRuntime::isCovered (int channel, Control c) const noexcept

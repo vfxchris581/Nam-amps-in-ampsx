@@ -66,6 +66,8 @@ public:
     void discardPending (int index);
     /** Re-run the sound analysis of every capture in the current amp (background). */
     void reanalyseCurrentAmp();
+    /** Background: build a blend amp from NAM models of different amps (2..4), then load it. */
+    void createBlend (const juce::String& name, const juce::StringArray& namFiles);
 
     juce::String loadImpulseResponse (int slot, const juce::File& f);
     void clearImpulseResponse (int slot);
@@ -123,6 +125,7 @@ private:
             *bias, *sag, *nfb, *transformer, *mismatch, *speaker, *harmOn, *harmAmount, *harmEvenOdd, *harmTouch,
             *harmAttack, *harmLowDef, *harmHighDetail, *cabOn, *cabStereo, *cabAutoAlign, *cabBlend, *cabLevel,
             *ir1On, *ir1Level, *ir1Pan, *ir1Invert, *ir1Delay, *ir2On, *ir2Level, *ir2Pan, *ir2Invert, *ir2Delay;
+        std::atomic<float>* blendMix[4];
     } rp {};
     double preparedRate = 0.0;
     int preparedBlock = 0;

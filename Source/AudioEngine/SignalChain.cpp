@@ -159,6 +159,7 @@ void SignalChain::processMono (double* x, int n) noexcept
     {
         res = rt->setKnobs (channel, p.knobs);
         if (chanFade > 0 && prevChannel >= 0) rt->setKnobs (prevChannel, p.knobs);
+        if (rt->isBlend()) rt->setBlendLevels (channel, p.blendMix);
     }
     else
     {
@@ -190,6 +191,7 @@ void SignalChain::processMono (double* x, int n) noexcept
     if (fadingOut != nullptr)
     {
         fadingOut->setKnobs (std::min (channel, fadingOut->numChannels() - 1), p.knobs);
+        if (fadingOut->isBlend()) fadingOut->setBlendLevels (std::min (channel, fadingOut->numChannels() - 1), p.blendMix);
         fadingOut->process (std::min (channel, fadingOut->numChannels() - 1), scratch.data(), ampTmp.data(), n);
         for (int i = 0; i < n; ++i)
         {

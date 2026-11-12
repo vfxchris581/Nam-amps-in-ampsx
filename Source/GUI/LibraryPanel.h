@@ -37,6 +37,9 @@ private:
     PresetList presetModel;
     juce::ListBox amps { "amps", &ampModel }, presets { "presets", &presetModel };
     juce::TextButton loadAmp { "Load" }, renameAmp { "Rename" }, deleteAmp { "Delete" };
+    juce::TextButton newBlend { "New blend from NAM models..." };
+    juce::Label blendHelp;
+    std::unique_ptr<juce::FileChooser> chooser;
     juce::TextButton renameChannel { "Rename channel" }, addChannel { "Add channel" }, removeChannel { "Remove channel" };
     juce::ComboBox channelBox;
     juce::Label ampDetails;

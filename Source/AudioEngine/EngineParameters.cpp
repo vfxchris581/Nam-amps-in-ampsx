@@ -55,6 +55,8 @@ const std::vector<ParamSpec>& parameterSpecs()
         f (pid::ir2Pan, "IR 2 Pan", -1.0, 1.0, 0.0);
         b (pid::ir2Invert, "IR 2 Polarity", false);
         f (pid::ir2Delay, "IR 2 Delay", 0.0, 10.0, 0.0, "ms");
+        for (int i = 0; i < 4; ++i)
+            f (pid::blendMix[i], "Blend Mix " + std::to_string (i + 1), 0.0, 1.0, 1.0);
         return s;
     }();
     return specs;

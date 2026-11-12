@@ -81,7 +81,8 @@ void NamVXProcessor::init (const juce::File& root)
            raw (pid::harmLowDef), raw (pid::harmHighDetail), raw (pid::cabOn), raw (pid::cabStereo),
            raw (pid::cabAutoAlign), raw (pid::cabBlend), raw (pid::cabLevel), raw (pid::ir1On), raw (pid::ir1Level),
            raw (pid::ir1Pan), raw (pid::ir1Invert), raw (pid::ir1Delay), raw (pid::ir2On), raw (pid::ir2Level),
-           raw (pid::ir2Pan), raw (pid::ir2Invert), raw (pid::ir2Delay) };
+           raw (pid::ir2Pan), raw (pid::ir2Invert), raw (pid::ir2Delay), {} };
+    for (int i = 0; i < 4; ++i) rp.blendMix[i] = raw (pid::blendMix[i]);
     apvts.addParameterListener (pid::channel, this);
     chain.prepare (48000.0, 512);
     setStatus (library->getAmps().empty() ? "Drop NAM captures of one amp to build your first virtual amplifier"
@@ -134,6 +135,7 @@ void NamVXProcessor::snapshotParameters (EngineParameters& p) const noexcept
     p.cabBlend = f (rp.cabBlend); p.cabLevelDb = f (rp.cabLevel);
     p.ir1 = { b (rp.ir1On), f (rp.ir1Level), f (rp.ir1Pan), f (rp.ir1Delay), b (rp.ir1Invert) };
     p.ir2 = { b (rp.ir2On), f (rp.ir2Level), f (rp.ir2Pan), f (rp.ir2Delay), b (rp.ir2Invert) };
+    for (int i = 0; i < 4; ++i) p.blendMix[(size_t) i] = f (rp.blendMix[i]);
 }
 
 template <typename T>
@@ -282,6 +284,30 @@ void NamVXProcessor::discardPending (int index)
 {
     if (index >= 0 && index < (int) pending.size()) pending.erase (pending.begin() + index);
     sendChangeMessage();
+}
+
+void NamVXProcessor::createBlend (const juce::String& name, const juce::StringArray& namFiles)
+{
+    if (importing.exchange (true)) return;
+    std::vector<std::filesystem::path> files;
+    for (auto& f : namFiles) files.emplace_back (f.toStdString());
+    const auto root = library->getRoot();
+    const auto blendName = name.toStdString();
+    setStatus ("Analysing models for blend \"" + name + "\"...");
+    workers.addJob ([this, files, root, blendName] {
+        AmpLibrary worker (root);
+        std::string error;
+        const auto id = worker.createBlend (blendName, files, error);
+        juce::MessageManager::callAsync ([this, id, error, blendName] {
+            importing = false;
+            library->reload();
+            if (id.empty()) { setStatus ("Blend not created: " + juce::String (error)); return; }
+            for (int i = 0; i < 4; ++i)
+                if (auto* prm = apvts.getParameter (pid::blendMix[i])) prm->setValueNotifyingHost (1.0f);
+            loadAmp (id);
+            setStatus ("Blend \"" + juce::String (blendName) + "\" created - set the mix on the Amp page");
+        });
+    });
 }
 
 void NamVXProcessor::reanalyseCurrentAmp()

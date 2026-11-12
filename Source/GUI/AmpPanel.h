@@ -21,6 +21,8 @@ private:
     std::vector<std::unique_ptr<Knob>> knobs;
     juce::OwnedArray<juce::TextButton> channelButtons;
     Knob input, output;
+    std::vector<std::unique_ptr<Knob>> mixKnobs;
+    int numMix = 0;
     Toggle tube, power, harm, cab;
     Meter inMeter, outMeter;
     juce::Label blendInfo;

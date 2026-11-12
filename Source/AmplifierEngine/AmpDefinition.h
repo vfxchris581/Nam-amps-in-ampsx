@@ -42,6 +42,10 @@ struct AmpDefinition
     std::vector<ChannelDefinition> channels;
     std::string ir1Path, ir2Path;   // default cabinet for this amp (optional)
     std::string notes;
+    /** A blend mixes NAM models of *different* amps at user-set levels (Mix knobs) instead of
+        interpolating captures of one amp by knob position. */
+    bool isBlend = false;
+    static constexpr int kMaxBlendModels = 4;
 
     int totalCaptures() const;
     int findChannel (const std::string& name) const; // -1 if none (case/format-insensitive)

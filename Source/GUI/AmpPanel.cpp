@@ -15,6 +15,11 @@ AmpPanel::AmpPanel (NamVXProcessor& p)
         addAndMakeVisible (*knobs.back());
     }
     for (auto* c : { &input, &output }) addAndMakeVisible (*c);
+    for (int i = 0; i < AmpDefinition::kMaxBlendModels; ++i)
+    {
+        mixKnobs.push_back (std::make_unique<Knob> (p.getAPVTS(), pid::blendMix[i], "Model " + juce::String (i + 1)));
+        addChildComponent (*mixKnobs.back());
+    }
     for (auto* t : { &tube, &power, &harm, &cab }) addAndMakeVisible (*t);
     addAndMakeVisible (inMeter);
     addAndMakeVisible (outMeter);
@@ -51,6 +56,23 @@ void AmpPanel::refresh()
         }
         lastChannelCount = nCh;
     }
+
+    // Blend amps: one mix knob per model, captioned with the model's name.
+    numMix = 0;
+    if (amp && amp->isBlend && ! amp->channels.empty())
+    {
+        int i = 0;
+        for (auto& cap : amp->channels[0].captures)
+        {
+            if (! cap.enabled || i >= AmpDefinition::kMaxBlendModels) continue;
+            auto label = juce::String (cap.meta.name.empty() ? cap.meta.fileName : cap.meta.name);
+            if (label.length() > 22) label = label.substring (0, 21) + "...";
+            mixKnobs[(size_t) i]->setCaption (label);
+            ++i;
+        }
+        numMix = i;
+    }
+    for (int i = 0; i < (int) mixKnobs.size(); ++i) mixKnobs[(size_t) i]->setVisible (i < numMix);
 
     // Badge each control: NAM = realised by blending captures, DSP = realised by circuit/EQ.
     for (int k = 0; k < kNumControls; ++k)
@@ -118,7 +140,7 @@ void AmpPanel::paint (juce::Graphics& g)
     ui::drawPanel (g, strip);
     g.setColour (ui::textDim);
     g.setFont (ui::semi (10.5f).withExtraKerningFactor (0.2f));
-    g.drawText ("SIGNAL CHAIN", strip.reduced (150, 12).removeFromTop (14), juce::Justification::centred);
+    g.drawText (numMix > 0 ? juce::String::fromUTF8 ("SIGNAL CHAIN  \xc2\xb7  MODEL BLEND") : juce::String ("SIGNAL CHAIN"), strip.reduced (150, 12).removeFromTop (14), juce::Justification::centred);
 }
 
 void AmpPanel::resized()
@@ -144,7 +166,14 @@ void AmpPanel::resized()
     strip.removeFromRight (8);
     output.setBounds (strip.removeFromRight (96));
     strip.reduce (28, 0);
-    auto toggles = strip.removeFromTop (strip.getHeight() / 2).withTrimmedTop (14);
+    auto toggles = strip.removeFromTop (numMix > 0 ? 54 : strip.getHeight() / 2).withTrimmedTop (14);
+    if (numMix > 0)
+    {
+        auto mixRow = strip.removeFromTop (strip.getHeight() - 34);
+        const int w = std::min (170, mixRow.getWidth() / numMix);
+        mixRow = mixRow.withSizeKeepingCentre (w * numMix, mixRow.getHeight());
+        for (int i = 0; i < numMix; ++i) mixKnobs[(size_t) i]->setBounds (mixRow.removeFromLeft (w));
+    }
     const int tw = toggles.getWidth() / 4;
     for (auto* t : { &tube, &power, &harm, &cab }) t->setBounds (toggles.removeFromLeft (tw).withSizeKeepingCentre (tw - 8, 30));
     blendInfo.setBounds (strip.withTrimmedBottom (10));
@@ -160,8 +189,9 @@ void AmpPanel::timerCallback()
     {
         const int c = proc.getCurrentChannel();
         const int n = c < (int) amp->channels.size() ? (int) amp->channels[(size_t) c].captures.size() : 0;
-        info << "Channel " << (c + 1) << ": blending " << ch.runningModels.load() << " of " << n
-             << " NAM captures  \xc2\xb7  latency " << ch.getLatencySamples() << " samples  \xc2\xb7  " << proc.getStatus();
+        if (amp->isBlend) info << "Model blend: " << ch.runningModels.load() << " of " << n << " models playing";
+        else info << "Channel " << (c + 1) << ": blending " << ch.runningModels.load() << " of " << n << " NAM captures";
+        info << juce::String::fromUTF8 ("  \xc2\xb7  latency ") << ch.getLatencySamples() << " samples  \xc2\xb7  " << proc.getStatus();
     }
     else
         info = proc.getStatus();

@@ -2,6 +2,7 @@
 // Plain-value snapshot of every engine parameter (read once per block on the audio thread)
 // and the single table that defines parameter IDs, names and ranges for the plugin.
 
+#include <array>
 #include <string>
 #include <vector>
 #include "NAMMetadata/CaptureMetadata.h"
@@ -35,6 +36,8 @@ struct EngineParameters
     bool cabOn = true, cabStereo = true, cabAutoAlign = true;
     double cabBlend = 0.5, cabLevelDb = 0.0;
     SlotParams ir1, ir2;
+
+    std::array<double, 4> blendMix { 1.0, 1.0, 1.0, 1.0 }; // blend amps: level of each model
 };
 
 enum class ParamKind { Float, Bool, Choice };
@@ -90,5 +93,6 @@ namespace pid
     inline const char* ir2Pan = "ir2Pan";
     inline const char* ir2Invert = "ir2Invert";
     inline const char* ir2Delay = "ir2Delay";
+    inline const char* blendMix[4] = { "blendMix1", "blendMix2", "blendMix3", "blendMix4" };
 } // namespace pid
 } // namespace namvx

@@ -70,6 +70,7 @@ nlohmann::json toJson (const AmpDefinition& a)
     j["ir1"] = a.ir1Path;
     j["ir2"] = a.ir2Path;
     j["notes"] = a.notes;
+    j["blend"] = a.isBlend;
     auto chans = nlohmann::json::array();
     for (auto& ch : a.channels)
     {
@@ -126,6 +127,7 @@ AmpDefinition ampFromJson (const nlohmann::json& j)
     a.ir1Path = get<std::string> (j, "ir1", "");
     a.ir2Path = get<std::string> (j, "ir2", "");
     a.notes = get<std::string> (j, "notes", "");
+    a.isBlend = get<bool> (j, "blend", false);
     if (j.contains ("channels") && j["channels"].is_array())
         for (auto& cj : j["channels"])
         {

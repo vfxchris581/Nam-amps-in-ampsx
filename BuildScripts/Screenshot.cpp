@@ -77,8 +77,21 @@ public:
         {
             AmpLibrary lib (root.getChildFile ("Library").getFullPathName().toStdString());
             lib.importFiles ({ caps.getFullPathName().toStdString() });
+            // a model blend of three different "amps"
+            auto bl = root.getChildFile ("blend");
+            bl.createDirectory();
+            writeDemoCapture (bl, "Plexi 1959 Crunch", "Plexi 1959 Crunch");
+            writeDemoCapture (bl, "Recto Modern Lead", "Recto Modern Lead");
+            writeDemoCapture (bl, "Deluxe Clean Edge", "Deluxe Clean Edge");
+            std::string err;
+            blendId = lib.createBlend ("Plexi x Recto x Deluxe",
+                                       { bl.getChildFile ("Plexi 1959 Crunch.nam").getFullPathName().toStdString(),
+                                         bl.getChildFile ("Recto Modern Lead.nam").getFullPathName().toStdString(),
+                                         bl.getChildFile ("Deluxe Clean Edge.nam").getFullPathName().toStdString() }, err);
         }
         processor = std::make_unique<NamVXProcessor> (root);
+        for (auto& a : processor->getLibrary().getAmps())
+            if (! a.isBlend) { processor->loadAmp (a.id); break; }
         processor->loadImpulseResponse (0, writeDemoIR (root, "4x12 V30 SM57 Cap Edge", 48000, 0.35f, 1));
         processor->loadImpulseResponse (1, writeDemoIR (root, "4x12 V30 R121 Cone", 96000, 0.25f, 1, 0.35));
         processor->savePreset ("Crunch Rhythm");
@@ -99,8 +112,38 @@ public:
     void timerCallback() override
     {
         stopTimer();
-        if (phase++ == 0) { playAudio(); startTimer (400); return; } // let meters/status timers repaint
-        snapshot();
+        if (phase == 0) { ++phase; playAudio(); startTimer (400); return; } // let meters/status timers repaint
+        if (phase == 1)
+        {
+            ++phase;
+            snapshot();
+            if (! blendId.empty())
+            {
+                processor->loadAmp (blendId);
+                const float mix[] = { 0.7f, 0.3f, 0.5f, 1.0f };
+                for (int i = 0; i < 4; ++i)
+                    if (auto* prm = processor->getAPVTS().getParameter (pid::blendMix[i])) prm->setValueNotifyingHost (mix[i]);
+                startTimer (3000); // runtime build + UI refresh
+                return;
+            }
+            finish();
+            return;
+        }
+        if (phase == 2) { ++phase; playAudio(); startTimer (400); return; }
+        // phase 3: blend shots
+        auto shot = [this] (int tab, const char* file) {
+            editor->showTab (tab);
+            editor->setSize (NamVXEditor::kWidth, NamVXEditor::kHeight);
+            auto img = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.5f);
+            auto f = outDir.getChildFile (file);
+            f.deleteFile();
+            juce::PNGImageFormat png;
+            if (auto os = f.createOutputStream()) png.writeImageToStream (img, *os);
+            std::printf ("wrote %s\n", f.getFullPathName().toRawUTF8());
+        };
+        shot (0, "namvx-blend.png");
+        shot (4, "namvx-library.png");
+        finish();
     }
 
     void playAudio()
@@ -134,6 +177,10 @@ public:
             if (auto os = f.createOutputStream()) png.writeImageToStream (img, *os);
             std::printf ("wrote %s\n", f.getFullPathName().toRawUTF8());
         }
+    }
+
+    void finish()
+    {
         // app icon (also used by the plugin bundle)
         {
             juce::Image icon (juce::Image::ARGB, 512, 512, true);
@@ -157,6 +204,7 @@ public:
 
 private:
     juce::File outDir;
+    std::string blendId;
     int phase = 0;
     std::unique_ptr<NamVXProcessor> processor;
     std::unique_ptr<NamVXEditor> editor;

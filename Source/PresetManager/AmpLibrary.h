@@ -55,6 +55,10 @@ public:
     std::string assignPending (const PendingCapture& p, const std::string& manufacturer,
                                const std::string& model, const std::string& channel = {});
 
+    /** Creates a blend amp from NAM models of any amps (2..4). Blocking (analyses each model).
+        Returns the new amp id, or empty with 'error' filled. */
+    std::string createBlend (const std::string& name, const std::vector<std::filesystem::path>& files, std::string& error);
+
     bool save (AmpDefinition amp);       // insert or replace by id
     bool remove (const std::string& id); // deletes definition and library capture copies
     bool rename (const std::string& id, const std::string& newName);

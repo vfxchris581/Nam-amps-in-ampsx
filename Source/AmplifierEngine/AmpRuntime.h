@@ -37,6 +37,10 @@ public:
     /** Audio thread: mono in → mono out through one channel's blended captures. */
     void process (int channel, const double* in, double* out, int n) noexcept;
 
+    /** Blend amps: audio thread, sets the mix level (0..1) of each model; weights are normalised. */
+    void setBlendLevels (int channel, const std::array<double, AmpDefinition::kMaxBlendModels>& levels) noexcept;
+    bool isBlend() const noexcept { return blend; }
+
     bool isCovered (int channel, Control c) const noexcept;
     int numRunningModels (int channel) const noexcept;
 
@@ -52,5 +56,6 @@ private:
     std::vector<Channel> channels;
     std::string ampId;
     int latency = 0;
+    bool blend = false;
 };
 } // namespace namvx

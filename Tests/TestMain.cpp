@@ -589,6 +589,47 @@ TEST (runtime_treble_knob_moves_between_captures)
     CHECK (std::abs (tst::db (t2 / t8)) > 0.5); // the two ends really are different captures
 }
 
+TEST (model_blend_mixes_different_amps)
+{
+    const auto dir = tempDir ("blend");
+    const auto a = makeCapture (dir, "Plexi Crunch", "Marshall", "1959 SLP", "Plexi Crunch", "wavenet_a1_standard.nam");
+    const auto b = makeCapture (dir, "Recto Modern", "Mesa/Boogie", "Dual Rectifier", "Recto Modern", "wavenet.nam");
+
+    AmpLibrary lib (tempDir ("blend_lib"));
+    std::string err;
+    const auto id = lib.createBlend ("Plexi + Recto", { a, b }, err);
+    CHECK_MSG (! id.empty(), "%s", err.c_str());
+    const auto* def = lib.find (id);
+    CHECK (def != nullptr && def->isBlend && def->channels.size() == 1 && def->channels[0].captures.size() == 2);
+
+    // an automatic import of a Marshall capture must create its own amp, never join the blend
+    lib.importFiles ({ makeCapture (dir, "Plexi Clean", "Marshall", "1959 SLP", "Plexi Clean") }, {}, false);
+    CHECK (lib.find (id)->totalCaptures() == 2);
+    AmpLibrary reloaded (lib.getRoot());
+    CHECK (reloaded.find (id) != nullptr && reloaded.find (id)->isBlend);
+
+    std::vector<std::string> errors;
+    auto rt = AmpRuntime::build (*lib.find (id), 48000, 256, {}, errors);
+    CHECK (errors.empty() && rt->isBlend());
+
+    auto run = [&] (std::array<double, 4> levels) {
+        auto x = tst::sine (330.0, 48000, 48000, 0.2);
+        std::vector<double> y (x.size());
+        for (size_t i = 0; i < x.size(); i += 256)
+        {
+            rt->setKnobs (0, { 5, 5, 5, 5, 5, 5, 5, 5 });
+            rt->setBlendLevels (0, levels);
+            rt->process (0, x.data() + i, y.data() + i, (int) std::min<size_t> (256, x.size() - i));
+        }
+        return tst::tone (y, 24000, 16384, 330, 48000);
+    };
+    const double onlyA = run ({ 1, 0, 0, 0 }), onlyB = run ({ 0, 1, 0, 0 }), both = run ({ 1, 1, 0, 0 });
+    INFO ("330 Hz: only A %.4f  only B %.4f  50/50 %.4f", onlyA, onlyB, both);
+    CHECK (std::abs (tst::db (onlyA / onlyB)) > 0.5);                  // really two different amps
+    CHECK (both > std::min (onlyA, onlyB) * 0.5 && both < std::max (onlyA, onlyB) * 1.5);
+    CHECK (rt->numRunningModels (0) >= 1);
+}
+
 static std::vector<double> runChain (SignalChain& chain, EngineParameters p, const std::vector<double>& x, int block = 256)
 {
     std::vector<double> l (x.size()), r (x.size());

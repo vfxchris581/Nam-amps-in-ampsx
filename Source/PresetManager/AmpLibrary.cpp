@@ -176,6 +176,44 @@ ImportResult AmpLibrary::importFiles (const std::vector<fs::path>& files, Progre
     return res;
 }
 
+std::string AmpLibrary::createBlend (const std::string& name, const std::vector<fs::path>& files, std::string& error)
+{
+    const auto all = NamLoader::collectNamFiles (files);
+    if (all.size() < 2) { error = "Pick at least two NAM models to blend."; return {}; }
+    if ((int) all.size() > AmpDefinition::kMaxBlendModels)
+    { error = "A blend holds up to " + std::to_string (AmpDefinition::kMaxBlendModels) + " models."; return {}; }
+
+    AmpDefinition amp;
+    amp.id = makeId();
+    amp.isBlend = true;
+    amp.name = name.empty() ? std::string ("Blend") : name;
+    amp.manufacturer = "Model blend";
+    amp.model = amp.name;
+    amp.identityKey = "blend|" + amp.id; // unique: automatic imports never join a blend
+    ChannelDefinition ch;
+    ch.name = "Blend";
+    for (const auto& f : all)
+    {
+        try
+        {
+            CaptureEntry e;
+            e.id = makeId();
+            e.meta = readCaptureMetadata (f);
+            NamModel m;
+            m.load (f);
+            e.analysis = ProfileAnalyzer::analyse (m);
+            if (e.meta.expectedSampleRate <= 0) e.meta.expectedSampleRate = m.getModelSampleRate();
+            e.path = placeInLibrary (amp.id, f);
+            ch.captures.push_back (std::move (e));
+        }
+        catch (const std::exception& ex) { error = f.filename().string() + ": " + ex.what(); return {}; }
+    }
+    amp.channels.push_back (std::move (ch));
+    writeAmp (amp);
+    amps.push_back (amp);
+    return amp.id;
+}
+
 std::string AmpLibrary::assignPending (const PendingCapture& p, const std::string& make, const std::string& model,
                                        const std::string& channel)
 {

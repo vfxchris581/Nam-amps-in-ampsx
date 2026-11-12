@@ -19,8 +19,9 @@ void LibraryPanel::AmpList::paintListBoxItem (int row, juce::Graphics& g, int w,
     g.drawText (a.name, 30, 4, w - 40, h / 2, juce::Justification::centredLeft);
     g.setColour (ui::textDim);
     g.setFont (ui::body (12.0f));
-    g.drawText (juce::String (a.manufacturer) + "  \xc2\xb7  " + juce::String ((int) a.channels.size()) + " ch  \xc2\xb7  "
-                    + juce::String (a.totalCaptures()) + " captures",
+    g.drawText (a.isBlend ? juce::String::fromUTF8 ("Model blend  \xc2\xb7  ") + juce::String (a.totalCaptures()) + " models"
+                          : juce::String (a.manufacturer) + "  \xc2\xb7  " + juce::String ((int) a.channels.size()) + " ch  \xc2\xb7  "
+                                + juce::String (a.totalCaptures()) + " captures",
                 30, h / 2, w - 40, h / 2 - 4, juce::Justification::centredLeft);
 }
 
@@ -60,11 +61,36 @@ LibraryPanel::LibraryPanel (NamVXProcessor& p) : proc (p)
                                 (juce::Component*) &renameAmp, (juce::Component*) &deleteAmp, (juce::Component*) &renameChannel,
                                 (juce::Component*) &addChannel, (juce::Component*) &removeChannel, (juce::Component*) &channelBox,
                                 (juce::Component*) &ampDetails, (juce::Component*) &loadPreset, (juce::Component*) &savePreset,
-                                (juce::Component*) &renamePreset, (juce::Component*) &deletePreset })
+                                (juce::Component*) &renamePreset, (juce::Component*) &deletePreset,
+                                (juce::Component*) &newBlend, (juce::Component*) &blendHelp })
         addAndMakeVisible (c);
     ampDetails.setFont (ui::body (12.5f));
     ampDetails.setColour (juce::Label::textColourId, ui::textDim);
     ampDetails.setJustificationType (juce::Justification::topLeft);
+
+    newBlend.setColour (juce::TextButton::buttonColourId, ui::gold.withAlpha (0.22f));
+    blendHelp.setFont (ui::body (12.0f));
+    blendHelp.setColour (juce::Label::textColourId, ui::textDim);
+    blendHelp.setJustificationType (juce::Justification::topLeft);
+    blendHelp.setText ("Mix 2-4 NAM models of different amps into one amp. Levels and timing are matched "
+                       "automatically; set the mix with the Model knobs on the Amp page.", juce::dontSendNotification);
+    newBlend.onClick = [this] {
+        chooser = std::make_unique<juce::FileChooser> ("Pick 2-4 NAM models to blend", juce::File(), "*.nam;*.NAM");
+        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
+                                  | juce::FileBrowserComponent::canSelectMultipleItems,
+                              [this] (const juce::FileChooser& fc) {
+                                  juce::StringArray paths;
+                                  for (auto& f : fc.getResults()) paths.add (f.getFullPathName());
+                                  if (paths.isEmpty()) return;
+                                  if (paths.size() < 2 || paths.size() > AmpDefinition::kMaxBlendModels)
+                                  {
+                                      juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, "Model blend",
+                                                                              "Select between 2 and 4 .nam files.");
+                                      return;
+                                  }
+                                  askText ("Name this blend", "My Blend", [this, paths] (juce::String n) { proc.createBlend (n, paths); });
+                              });
+    };
 
     loadAmp.onClick = [this] { if (auto* a = selectedAmp()) proc.loadAmp (a->id); };
     renameAmp.onClick = [this] {
@@ -198,6 +224,10 @@ void LibraryPanel::resized()
     channelBox.setBounds (side.removeFromTop (30));
     side.removeFromTop (8);
     for (auto* b : { &renameChannel, &addChannel, &removeChannel }) { b->setBounds (side.removeFromTop (30)); side.removeFromTop (6); }
+    side.removeFromTop (18);
+    newBlend.setBounds (side.removeFromTop (34));
+    side.removeFromTop (6);
+    blendHelp.setBounds (side.removeFromTop (64));
 
     auto p = presetArea.reduced (16, 12);
     p.removeFromTop (24);

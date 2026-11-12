@@ -28,6 +28,7 @@ public:
     }
 
     void setBadge (const juce::String& b, juce::Colour c) { badge = b; badgeColour = c; repaint(); }
+    void setCaption (const juce::String& c) { if (c != name) { name = c; repaint(); } }
 
     void paint (juce::Graphics& g) override
     {
