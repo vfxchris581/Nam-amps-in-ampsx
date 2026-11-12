@@ -41,6 +41,11 @@ public:
     void setBlendLevels (int channel, const std::array<double, AmpDefinition::kMaxBlendModels>& levels) noexcept;
     bool isBlend() const noexcept { return blend; }
 
+    /** Blend amps: per-band correction (dB) that gives the gain-source mix the tonal balance chosen
+        per band. gainLevels = audio mix of the models; bandLevels[band][model] = source mix per band. */
+    std::array<double, 5> toneCorrection (int channel, const std::array<double, AmpDefinition::kMaxBlendModels>& gainLevels,
+                                          const std::array<std::array<double, AmpDefinition::kMaxBlendModels>, 5>& bandLevels) const noexcept;
+
     bool isCovered (int channel, Control c) const noexcept;
     int numRunningModels (int channel) const noexcept;
 
@@ -52,6 +57,7 @@ private:
         CaptureBlender blender;
         KnobCoords baseline {};   // value used for uncovered controls
         IntDelay pad;             // equalises latency across channels
+        std::vector<std::array<double, 5>> bands; // analysed tonal balance per source (dB)
     };
     std::vector<Channel> channels;
     std::string ampId;

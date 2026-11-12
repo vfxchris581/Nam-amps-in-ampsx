@@ -4,7 +4,7 @@ namespace namvx
 {
 NamVXEditor::NamVXEditor (NamVXProcessor& p)
     : AudioProcessorEditor (p), proc (p),
-      ampPanel (p), capturesPanel (p), cabinetPanel (p), tubePanel (p), libraryPanel (p)
+      ampPanel (p), capturesPanel (p), cabinetPanel (p), tubePanel (p), libraryPanel (p), toneMatrixPanel (p)
 {
     setLookAndFeel (&lnf);
     addAndMakeVisible (content);
@@ -16,6 +16,7 @@ NamVXEditor::NamVXEditor (NamVXProcessor& p)
     tabs.setOutline (0);
     tabs.setColour (juce::TabbedComponent::backgroundColourId, ui::bg);
     tabs.addTab ("Amp", ui::bg, &ampPanel, false);
+    tabs.addTab ("Tone Matrix", ui::bg, &toneMatrixPanel, false);
     tabs.addTab ("Captures", ui::bg, &capturesPanel, false);
     tabs.addTab ("Cabinet", ui::bg, &cabinetPanel, false);
     tabs.addTab ("Tube & Harmonics", ui::bg, &tubePanel, false);
@@ -97,6 +98,7 @@ void NamVXEditor::refreshAll()
     cabinetPanel.refresh();
     tubePanel.refresh();
     libraryPanel.refresh();
+    toneMatrixPanel.refresh();
 }
 
 void NamVXEditor::paint (juce::Graphics& g)
@@ -204,12 +206,12 @@ void NamVXEditor::filesDropped (const juce::StringArray& files, int, int)
         if (irs.size() > 2)
             errors.add ("Dropped " + juce::String (irs.size()) + " impulse responses: the first " + juce::String (loaded)
                         + " were loaded. Use Load IR... on the Cabinet page to pick others.");
-        tabs.setCurrentTabIndex (2);
+        tabs.setCurrentTabIndex (tabCabinet);
     }
     if (! nams.isEmpty())
     {
         proc.importFiles (nams);
-        tabs.setCurrentTabIndex (0);
+        tabs.setCurrentTabIndex (tabAmp);
     }
     if (! errors.isEmpty())
         juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "Impulse responses", errors.joinIntoString ("\n\n"));

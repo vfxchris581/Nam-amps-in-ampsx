@@ -56,7 +56,10 @@ const std::vector<ParamSpec>& parameterSpecs()
         b (pid::ir2Invert, "IR 2 Polarity", false);
         f (pid::ir2Delay, "IR 2 Delay", 0.0, 10.0, 0.0, "ms");
         for (int i = 0; i < 4; ++i)
-            f (pid::blendMix[i], "Blend Mix " + std::to_string (i + 1), 0.0, 1.0, 1.0);
+            f (pid::blendMix[i], "Gain Source " + std::to_string (i + 1), 0.0, 1.0, 1.0);
+        for (int b = 0; b < 5; ++b)
+            for (int m = 0; m < 4; ++m)
+                f (pid::toneSource[b][m], std::string (pid::toneBandName[b]) + " Source " + std::to_string (m + 1), 0.0, 1.0, 1.0);
         return s;
     }();
     return specs;

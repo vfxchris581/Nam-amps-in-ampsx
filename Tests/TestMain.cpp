@@ -15,6 +15,7 @@
 #include "ProfileInterpolation/ProfileInterpolator.h"
 #include "ProfileInterpolation/CaptureBlender.h"
 #include "AmplifierEngine/AmpRuntime.h"
+#include "AmplifierEngine/ToneMatch.h"
 #include "ChannelManager/ChannelManager.h"
 #include "PresetManager/AmpLibrary.h"
 #include "PresetManager/PresetManager.h"
@@ -644,6 +645,80 @@ static std::vector<double> runChain (SignalChain& chain, EngineParameters p, con
         std::copy (buf.begin(), buf.begin() + n, l.begin() + (long) i);
     }
     return l;
+}
+
+TEST (tone_match_lands_each_band_on_target)
+{
+    // The five EQ sections are solved jointly: measured band levels must hit the request.
+    const double fs = 48000;
+    const std::array<std::array<double, 5>, 3> requests { { { 4, -3, 2, -5, 6 }, { -8, 8, -8, 8, -8 }, { 0, 6, 0, 0, 0 } } };
+    for (const auto& req : requests)
+    {
+        ToneMatch tm;
+        tm.prepare (fs);
+        tm.setCorrectionDb (req);
+        std::vector<double> warm (48000, 0.0);
+        tm.process (warm.data(), (int) warm.size()); // let the glide settle
+        double worst = 0;
+        for (int b = 0; b < 5; ++b)
+        {
+            auto x = tst::sine (ToneMatch::kCentres[b], fs, 48000, 0.1);
+            tm.process (x.data(), (int) x.size());
+            const double got = tst::db (tst::tone (x, 24000, 16384, ToneMatch::kCentres[b], fs) / 0.1);
+            worst = std::max (worst, std::abs (got - req[(size_t) b]));
+        }
+        INFO ("request %+.0f %+.0f %+.0f %+.0f %+.0f dB -> worst band error %.2f dB", req[0], req[1], req[2], req[3], req[4], worst);
+        CHECK (worst < 0.75);
+    }
+}
+
+TEST (tone_matrix_transfers_bands_between_captures)
+{
+    const auto dir = tempDir ("matrix");
+    const auto a = makeCapture (dir, "A", "X", "A", "A", "wavenet_a1_standard.nam");
+    const auto b = makeCapture (dir, "B", "Y", "B", "B", "wavenet.nam");
+    AmpLibrary lib (tempDir ("matrix_lib"));
+    std::string err;
+    const auto id = lib.createBlend ("AB", { a, b }, err);
+    const auto& caps = lib.find (id)->channels[0].captures;
+    std::vector<std::string> errors;
+    auto rt = AmpRuntime::build (*lib.find (id), 48000, 256, {}, errors);
+
+    using L = std::array<double, 4>;
+    const L gainA { 1, 0, 0, 0 };
+    std::array<L, 5> even;    even.fill ({ 1, 1, 0, 0 });
+    std::array<L, 5> ownA;    ownA.fill ({ 1, 0, 0, 0 });
+    std::array<L, 5> bassFromB = ownA;  bassFromB[1] = { 0, 1, 0, 0 };
+
+    // Gain from A with every band from A: nothing to change.
+    for (double v : rt->toneCorrection (0, gainA, ownA)) CHECK (std::abs (v) < 1e-9);
+    // Bass from B on A's gain: bass band moves by exactly B.bass - A.bass, others untouched.
+    const auto c = rt->toneCorrection (0, gainA, bassFromB);
+    const double expect = std::clamp (caps[1].analysis->bandsDb[1] - caps[0].analysis->bandsDb[1], -12.0, 12.0);
+    INFO ("bass from B onto A: correction %+.2f dB (A bass %+.1f, B bass %+.1f)", c[1], caps[0].analysis->bandsDb[1], caps[1].analysis->bandsDb[1]);
+    CHECK (std::abs (c[1] - expect) < 1e-9);
+    CHECK (std::abs (c[0]) < 1e-9 && std::abs (c[2]) < 1e-9 && std::abs (c[3]) < 1e-9 && std::abs (c[4]) < 1e-9);
+    // Even 50/50 bands on A's gain: half-way.
+    const auto h = rt->toneCorrection (0, gainA, even);
+    CHECK (std::abs (h[1] - 0.5 * (caps[1].analysis->bandsDb[1] - caps[0].analysis->bandsDb[1])) < 1e-6);
+
+    // End to end through the signal chain: choosing B's bass changes A's low end by that amount.
+    SignalChain chain;
+    chain.prepare (48000, 256);
+    chain.publishRuntime (AmpRuntime::build (*lib.find (id), 48000, 256, {}, errors));
+    EngineParameters p;
+    p.cabOn = false; p.harmonicsOn = false;
+    p.blendMix = gainA;
+    auto levelAt = [&] (const std::array<L, 5>& src, double f) {
+        p.toneSource = src;
+        std::vector<double> x = tst::sine (f, 48000, 48000 * 2, 0.02);
+        auto y = runChain (chain, p, x);
+        return tst::tone (y, y.size() - 16384, 16384, f, 48000);
+    };
+    const double before = levelAt (ownA, 190.0), after = levelAt (bassFromB, 190.0);
+    INFO ("190 Hz through the chain: own bass %.5f, bass from B %.5f (%+.2f dB, expected %+.2f)", before, after,
+          tst::db (after / before), expect);
+    CHECK (std::abs (tst::db (after / before) - expect) < 1.5);
 }
 
 static double bandLevel (const std::vector<double>& y, double fs, double f)

@@ -49,7 +49,7 @@ public:
     juce::Font getPopupMenuFont() override { return ui::body (14.0f); }
     juce::Font getLabelFont (juce::Label&) override { return ui::body (13.0f); }
     void drawTabButton (juce::TabBarButton&, juce::Graphics&, bool over, bool down) override;
-    int getTabButtonBestWidth (juce::TabBarButton&, int) override { return 150; }
+    int getTabButtonBestWidth (juce::TabBarButton&, int) override { return 160; }
     void drawTabbedButtonBarBackground (juce::TabbedButtonBar&, juce::Graphics&) override {}
     void drawTabAreaBehindFrontButton (juce::TabbedButtonBar&, juce::Graphics&, int, int) override {}
     juce::Typeface::Ptr getTypefaceForFont (const juce::Font&) override;

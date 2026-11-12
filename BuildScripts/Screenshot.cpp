@@ -11,9 +11,9 @@ namespace
 {
 using namespace namvx;
 
-void writeDemoCapture (const juce::File& dir, const juce::String& file, const juce::String& name)
+void writeDemoCapture (const juce::File& dir, const juce::String& file, const juce::String& name, const char* source = "wavenet.nam")
 {
-    std::ifstream in (juce::File (NAMVX_EXAMPLE_MODELS).getChildFile ("wavenet.nam").getFullPathName().toStdString());
+    std::ifstream in (juce::File (NAMVX_EXAMPLE_MODELS).getChildFile (source).getFullPathName().toStdString());
     nlohmann::json j; in >> j;
     j["metadata"]["gear_make"] = "Demo Amplification";
     j["metadata"]["gear_model"] = "Lead 100";
@@ -80,9 +80,9 @@ public:
             // a model blend of three different "amps"
             auto bl = root.getChildFile ("blend");
             bl.createDirectory();
-            writeDemoCapture (bl, "Plexi 1959 Crunch", "Plexi 1959 Crunch");
+            writeDemoCapture (bl, "Plexi 1959 Crunch", "Plexi 1959 Crunch", "wavenet_a1_standard.nam");
             writeDemoCapture (bl, "Recto Modern Lead", "Recto Modern Lead");
-            writeDemoCapture (bl, "Deluxe Clean Edge", "Deluxe Clean Edge");
+            writeDemoCapture (bl, "Deluxe Clean Edge", "Deluxe Clean Edge", "lstm.nam");
             std::string err;
             blendId = lib.createBlend ("Plexi x Recto x Deluxe",
                                        { bl.getChildFile ("Plexi 1959 Crunch.nam").getFullPathName().toStdString(),
@@ -120,9 +120,13 @@ public:
             if (! blendId.empty())
             {
                 processor->loadAmp (blendId);
-                const float mix[] = { 0.7f, 0.3f, 0.5f, 1.0f };
-                for (int i = 0; i < 4; ++i)
-                    if (auto* prm = processor->getAPVTS().getParameter (pid::blendMix[i])) prm->setValueNotifyingHost (mix[i]);
+                // gain mostly from model 1, bass only from model 2, mids blended 2+3, treble/presence from 3
+                const float gain[] = { 1.0f, 0.25f, 0.0f, 0.0f };
+                const float tone[5][4] = { { 0, 1, 0, 0 }, { 0, 1, 0, 0 }, { 0, 0.6f, 0.4f, 0 }, { 0, 0, 1, 0 }, { 0.3f, 0, 1, 0 } };
+                auto setP = [this] (const char* id, float v) {
+                    if (auto* prm = processor->getAPVTS().getParameter (id)) prm->setValueNotifyingHost (v); };
+                for (int i = 0; i < 4; ++i) setP (pid::blendMix[i], gain[i]);
+                for (int b = 0; b < 5; ++b) for (int m = 0; m < 4; ++m) setP (pid::toneSource[b][m], tone[b][m]);
                 startTimer (3000); // runtime build + UI refresh
                 return;
             }
@@ -141,8 +145,9 @@ public:
             if (auto os = f.createOutputStream()) png.writeImageToStream (img, *os);
             std::printf ("wrote %s\n", f.getFullPathName().toRawUTF8());
         };
-        shot (0, "namvx-blend.png");
-        shot (4, "namvx-library.png");
+        shot (NamVXEditor::tabAmp, "namvx-blend.png");
+        shot (NamVXEditor::tabToneMatrix, "namvx-tone-matrix.png");
+        shot (NamVXEditor::tabLibrary, "namvx-library.png");
         finish();
     }
 
@@ -165,8 +170,8 @@ public:
 
     void snapshot()
     {
-        const char* names[] = { "amp", "captures", "cabinet", "tube-harmonics", "library" };
-        for (int t = 0; t < 5; ++t)
+        const char* names[] = { "amp", "tone-matrix-empty", "captures", "cabinet", "tube-harmonics", "library" };
+        for (int t = 0; t < 6; ++t)
         {
             editor->showTab (t);
             editor->setSize (NamVXEditor::kWidth, NamVXEditor::kHeight);

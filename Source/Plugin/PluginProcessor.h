@@ -126,6 +126,7 @@ private:
             *harmAttack, *harmLowDef, *harmHighDetail, *cabOn, *cabStereo, *cabAutoAlign, *cabBlend, *cabLevel,
             *ir1On, *ir1Level, *ir1Pan, *ir1Invert, *ir1Delay, *ir2On, *ir2Level, *ir2Pan, *ir2Invert, *ir2Delay;
         std::atomic<float>* blendMix[4];
+        std::atomic<float>* toneSource[5][4];
     } rp {};
     double preparedRate = 0.0;
     int preparedBlock = 0;

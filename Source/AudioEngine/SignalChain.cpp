@@ -22,6 +22,7 @@ void SignalChain::prepare (double sr, int block)
     masterGain.snap (1.0); outGain.snap (1.0); tubeMix.snap (0.0); tubeDrive.snap (0.3); paDrive.snap (0.5);
 
     residual.prepare (sr, maxBlock);
+    toneMatch.prepare (sr);
     cabinet.prepare ({ sr, (juce::uint32) maxBlock, 2 });
     ampFadeLen = (int) (0.06 * sr);
     chanFadeLen = (int) (0.035 * sr);
@@ -209,6 +210,14 @@ void SignalChain::processMono (double* x, int n) noexcept
 
     residual.setAmounts (res, p.powerAmpOn);
     residual.process (x, n);
+
+    // ---- blend tone transfer: each band takes the balance of its chosen source captures --------
+    ToneMatch::Bands corr {};
+    if (rt != nullptr && rt->isBlend())
+        corr = rt->toneCorrection (channel, p.blendMix, p.toneSource);
+    for (int b = 0; b < 5; ++b) toneCorrectionDb[(size_t) b] = (float) corr[(size_t) b];
+    toneMatch.setCorrectionDb (corr);
+    toneMatch.process (x, n);
 
     // ---- harmonic engine + power amp (oversampled) -------------------------------------------
     {

@@ -83,6 +83,7 @@ void NamVXProcessor::init (const juce::File& root)
            raw (pid::ir1Pan), raw (pid::ir1Invert), raw (pid::ir1Delay), raw (pid::ir2On), raw (pid::ir2Level),
            raw (pid::ir2Pan), raw (pid::ir2Invert), raw (pid::ir2Delay), {} };
     for (int i = 0; i < 4; ++i) rp.blendMix[i] = raw (pid::blendMix[i]);
+    for (int b = 0; b < 5; ++b) for (int m = 0; m < 4; ++m) rp.toneSource[b][m] = raw (pid::toneSource[b][m]);
     apvts.addParameterListener (pid::channel, this);
     chain.prepare (48000.0, 512);
     setStatus (library->getAmps().empty() ? "Drop NAM captures of one amp to build your first virtual amplifier"
@@ -136,6 +137,7 @@ void NamVXProcessor::snapshotParameters (EngineParameters& p) const noexcept
     p.ir1 = { b (rp.ir1On), f (rp.ir1Level), f (rp.ir1Pan), f (rp.ir1Delay), b (rp.ir1Invert) };
     p.ir2 = { b (rp.ir2On), f (rp.ir2Level), f (rp.ir2Pan), f (rp.ir2Delay), b (rp.ir2Invert) };
     for (int i = 0; i < 4; ++i) p.blendMix[(size_t) i] = f (rp.blendMix[i]);
+    for (int b = 0; b < 5; ++b) for (int m = 0; m < 4; ++m) p.toneSource[(size_t) b][(size_t) m] = f (rp.toneSource[b][m]);
 }
 
 template <typename T>
@@ -304,6 +306,9 @@ void NamVXProcessor::createBlend (const juce::String& name, const juce::StringAr
             if (id.empty()) { setStatus ("Blend not created: " + juce::String (error)); return; }
             for (int i = 0; i < 4; ++i)
                 if (auto* prm = apvts.getParameter (pid::blendMix[i])) prm->setValueNotifyingHost (1.0f);
+            for (int b = 0; b < 5; ++b)
+                for (int m = 0; m < 4; ++m)
+                    if (auto* prm = apvts.getParameter (pid::toneSource[b][m])) prm->setValueNotifyingHost (1.0f);
             loadAmp (id);
             setStatus ("Blend \"" + juce::String (blendName) + "\" created - set the mix on the Amp page");
         });

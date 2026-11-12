@@ -29,6 +29,10 @@ std::unique_ptr<AmpRuntime> AmpRuntime::build (const AmpDefinition& def, double 
                 m->load (cap.path);
                 m->prepare (sr, maxBlock);
                 ch.models.push_back (std::move (m));
+                std::array<double, 5> bd {};
+                if (cap.analysis && cap.analysis->valid)
+                    for (int b = 0; b < 5; ++b) bd[(size_t) b] = cap.analysis->bandsDb[(size_t) b];
+                ch.bands.push_back (bd);
                 coords.push_back (cap.coords);
                 enabled.push_back (true);
                 used.push_back (&cap);
@@ -154,6 +158,33 @@ void AmpRuntime::setBlendLevels (int channel, const std::array<double, AmpDefini
         ++r.numActive;
     }
     ch.blender.setTargets (r);
+}
+
+std::array<double, 5> AmpRuntime::toneCorrection (int channel, const std::array<double, AmpDefinition::kMaxBlendModels>& gain,
+                                                  const std::array<std::array<double, AmpDefinition::kMaxBlendModels>, 5>& bandLevels) const noexcept
+{
+    std::array<double, 5> out {};
+    if (! blend || channel < 0 || channel >= (int) channels.size()) return out;
+    const auto& ch = channels[(size_t) channel];
+    const int n = std::min ((int) ch.bands.size(), AmpDefinition::kMaxBlendModels);
+    if (n == 0) return out;
+
+    double gs = 0.0;
+    for (int m = 0; m < n; ++m) gs += std::max (0.0, gain[(size_t) m]);
+    for (int b = 0; b < 5; ++b)
+    {
+        // what the audible mix already has in this band
+        double cur = 0.0;
+        if (gs > 0.0)
+            for (int m = 0; m < n; ++m) cur += std::max (0.0, gain[(size_t) m]) / gs * ch.bands[(size_t) m][(size_t) b];
+        // what the user wants this band to sound like
+        double ws = 0.0, tgt = 0.0;
+        for (int m = 0; m < n; ++m) ws += std::max (0.0, bandLevels[(size_t) b][(size_t) m]);
+        if (ws <= 0.0) continue; // no source chosen for this band: leave it as it is
+        for (int m = 0; m < n; ++m) tgt += std::max (0.0, bandLevels[(size_t) b][(size_t) m]) / ws * ch.bands[(size_t) m][(size_t) b];
+        out[(size_t) b] = std::clamp (tgt - cur, -12.0, 12.0);
+    }
+    return out;
 }
 
 bool AmpRuntime::isCovered (int channel, Control c) const noexcept

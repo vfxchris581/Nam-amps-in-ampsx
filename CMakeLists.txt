@@ -92,6 +92,7 @@ set(NAMVX_CORE_SOURCES
     Source/AmplifierEngine/AmpDefinition.cpp
     Source/AmplifierEngine/AmpRuntime.cpp
     Source/AmplifierEngine/ToneResidual.cpp
+    Source/AmplifierEngine/ToneMatch.cpp
     Source/ChannelManager/ChannelManager.cpp
     Source/TubeCircuitDSP/TriodeStage.cpp
     Source/TubeCircuitDSP/PowerAmpStage.cpp

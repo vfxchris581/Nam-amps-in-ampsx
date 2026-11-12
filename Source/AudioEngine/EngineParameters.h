@@ -37,7 +37,9 @@ struct EngineParameters
     double cabBlend = 0.5, cabLevelDb = 0.0;
     SlotParams ir1, ir2;
 
-    std::array<double, 4> blendMix { 1.0, 1.0, 1.0, 1.0 }; // blend amps: level of each model
+    std::array<double, 4> blendMix { 1.0, 1.0, 1.0, 1.0 }; // blend amps: gain source = audio mix of the models
+    // blend amps: tone source per band [resonance, bass, middle, treble, presence][model]
+    std::array<std::array<double, 4>, 5> toneSource { { { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, { 1, 1, 1, 1 } } };
 };
 
 enum class ParamKind { Float, Bool, Choice };
@@ -94,5 +96,11 @@ namespace pid
     inline const char* ir2Invert = "ir2Invert";
     inline const char* ir2Delay = "ir2Delay";
     inline const char* blendMix[4] = { "blendMix1", "blendMix2", "blendMix3", "blendMix4" };
+    // toneSource[band][model]: band 0 resonance, 1 bass, 2 middle, 3 treble, 4 presence
+    inline const char* toneSource[5][4] = {
+        { "toneRes1", "toneRes2", "toneRes3", "toneRes4" }, { "toneBass1", "toneBass2", "toneBass3", "toneBass4" },
+        { "toneMid1", "toneMid2", "toneMid3", "toneMid4" }, { "toneTreb1", "toneTreb2", "toneTreb3", "toneTreb4" },
+        { "tonePres1", "tonePres2", "tonePres3", "tonePres4" } };
+    inline const char* toneBandName[5] = { "Resonance", "Bass", "Middle", "Treble", "Presence" };
 } // namespace pid
 } // namespace namvx

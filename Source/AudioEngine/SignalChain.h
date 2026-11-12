@@ -15,6 +15,7 @@
 #include "RealtimeSwap.h"
 #include "AmplifierEngine/AmpRuntime.h"
 #include "AmplifierEngine/ToneResidual.h"
+#include "AmplifierEngine/ToneMatch.h"
 #include "TubeCircuitDSP/TriodeStage.h"
 #include "TubeCircuitDSP/PowerAmpStage.h"
 #include "HarmonicEngine/HarmonicEngine.h"
@@ -58,6 +59,7 @@ public:
     std::atomic<int> runningModels { 0 };
     std::atomic<bool> hasAmp { false };
     std::atomic<int> currentRuntimeChannels { 0 };
+    std::array<std::atomic<float>, 5> toneCorrectionDb {}; // blend tone transfer per band (UI read-out)
 
 private:
     void processMono (double* buf, int n) noexcept;
@@ -79,6 +81,7 @@ private:
     PowerAmpStage powerAmp;
     HarmonicEngine harmonics;
     ToneResidual residual;
+    ToneMatch toneMatch;
     DualCabinet cabinet;
 
     Smoothed inGain, residualIn, residualOut, volumeGain, masterGain, outGain, tubeMix, tubeDrive, paDrive;
