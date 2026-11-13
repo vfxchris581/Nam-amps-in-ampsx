@@ -59,6 +59,12 @@ public:
         Returns the new amp id, or empty with 'error' filled. */
     std::string createBlend (const std::string& name, const std::vector<std::filesystem::path>& files, std::string& error);
 
+    /** Loads one NAM file into a blend slot (0..7), replacing what was there. With an empty
+        ampId a new blend is created. Blocking (analyses the model). Returns the amp id. */
+    std::string setBlendSlot (const std::string& ampId, int slot, const std::filesystem::path& file,
+                              const std::string& newBlendName, std::string& error);
+    bool clearBlendSlot (const std::string& ampId, int slot);
+
     bool save (AmpDefinition amp);       // insert or replace by id
     bool remove (const std::string& id); // deletes definition and library capture copies
     bool rename (const std::string& id, const std::string& newName);

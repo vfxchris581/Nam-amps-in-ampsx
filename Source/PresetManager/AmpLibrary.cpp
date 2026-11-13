@@ -179,7 +179,7 @@ ImportResult AmpLibrary::importFiles (const std::vector<fs::path>& files, Progre
 std::string AmpLibrary::createBlend (const std::string& name, const std::vector<fs::path>& files, std::string& error)
 {
     const auto all = NamLoader::collectNamFiles (files);
-    if (all.size() < 2) { error = "Pick at least two NAM models to blend."; return {}; }
+    if (all.empty()) { error = "Pick at least one NAM model."; return {}; }
     if ((int) all.size() > AmpDefinition::kMaxBlendModels)
     { error = "A blend holds up to " + std::to_string (AmpDefinition::kMaxBlendModels) + " models."; return {}; }
 
@@ -204,6 +204,7 @@ std::string AmpLibrary::createBlend (const std::string& name, const std::vector<
             e.analysis = ProfileAnalyzer::analyse (m);
             if (e.meta.expectedSampleRate <= 0) e.meta.expectedSampleRate = m.getModelSampleRate();
             e.path = placeInLibrary (amp.id, f);
+            e.blendSlot = (int) ch.captures.size();
             ch.captures.push_back (std::move (e));
         }
         catch (const std::exception& ex) { error = f.filename().string() + ": " + ex.what(); return {}; }
@@ -212,6 +213,67 @@ std::string AmpLibrary::createBlend (const std::string& name, const std::vector<
     writeAmp (amp);
     amps.push_back (amp);
     return amp.id;
+}
+
+std::string AmpLibrary::setBlendSlot (const std::string& ampId, int slot, const fs::path& file,
+                                      const std::string& newBlendName, std::string& error)
+{
+    if (slot < 0 || slot >= AmpDefinition::kMaxBlendModels) { error = "No such slot."; return {}; }
+    AmpDefinition* amp = nullptr;
+    for (auto& a : amps) if (a.id == ampId && a.isBlend) amp = &a;
+    if (amp == nullptr)
+    {
+        AmpDefinition a;
+        a.id = makeId();
+        a.isBlend = true;
+        a.name = newBlendName.empty() ? std::string ("New Blend") : newBlendName;
+        a.manufacturer = "Model blend";
+        a.model = a.name;
+        a.identityKey = "blend|" + a.id;
+        ChannelDefinition ch;
+        ch.name = "Blend";
+        a.channels.push_back (ch);
+        amps.push_back (a);
+        amp = &amps.back();
+    }
+    if (amp->channels.empty()) { ChannelDefinition ch; ch.name = "Blend"; amp->channels.push_back (ch); }
+
+    CaptureEntry e;
+    try
+    {
+        e.id = makeId();
+        e.meta = readCaptureMetadata (file);
+        NamModel m;
+        m.load (file);
+        e.analysis = ProfileAnalyzer::analyse (m);
+        if (e.meta.expectedSampleRate <= 0) e.meta.expectedSampleRate = m.getModelSampleRate();
+        e.path = placeInLibrary (amp->id, file);
+        e.blendSlot = slot;
+    }
+    catch (const std::exception& ex) { error = file.filename().string() + ": " + ex.what(); return {}; }
+
+    auto& caps = amp->channels[0].captures;
+    // legacy blends: give every capture an explicit slot before replacing
+    for (size_t i = 0; i < caps.size(); ++i) if (caps[i].blendSlot < 0) caps[i].blendSlot = (int) i;
+    caps.erase (std::remove_if (caps.begin(), caps.end(), [slot] (const CaptureEntry& c) { return c.blendSlot == slot; }), caps.end());
+    caps.push_back (std::move (e));
+    std::sort (caps.begin(), caps.end(), [] (const CaptureEntry& a, const CaptureEntry& b) { return a.blendSlot < b.blendSlot; });
+    writeAmp (*amp);
+    return amp->id;
+}
+
+bool AmpLibrary::clearBlendSlot (const std::string& ampId, int slot)
+{
+    for (auto& a : amps)
+        if (a.id == ampId && a.isBlend && ! a.channels.empty())
+        {
+            auto& caps = a.channels[0].captures;
+            for (size_t i = 0; i < caps.size(); ++i) if (caps[i].blendSlot < 0) caps[i].blendSlot = (int) i;
+            const auto before = caps.size();
+            caps.erase (std::remove_if (caps.begin(), caps.end(), [slot] (const CaptureEntry& c) { return c.blendSlot == slot; }), caps.end());
+            if (caps.size() != before) { writeAmp (a); return true; }
+        }
+    return false;
 }
 
 std::string AmpLibrary::assignPending (const PendingCapture& p, const std::string& make, const std::string& model,

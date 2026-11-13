@@ -68,6 +68,9 @@ public:
     void reanalyseCurrentAmp();
     /** Background: build a blend amp from NAM models of different amps (2..4), then load it. */
     void createBlend (const juce::String& name, const juce::StringArray& namFiles);
+    /** Tone Matrix loader: put a NAM file in a slot of the current blend (creates a blend if needed). */
+    void loadBlendSlot (int slot, const juce::File& namFile);
+    void clearBlendSlot (int slot);
 
     juce::String loadImpulseResponse (int slot, const juce::File& f);
     void clearImpulseResponse (int slot);
@@ -125,8 +128,9 @@ private:
             *bias, *sag, *nfb, *transformer, *mismatch, *speaker, *harmOn, *harmAmount, *harmEvenOdd, *harmTouch,
             *harmAttack, *harmLowDef, *harmHighDetail, *cabOn, *cabStereo, *cabAutoAlign, *cabBlend, *cabLevel,
             *ir1On, *ir1Level, *ir1Pan, *ir1Invert, *ir1Delay, *ir2On, *ir2Level, *ir2Pan, *ir2Invert, *ir2Delay;
-        std::atomic<float>* blendMix[4];
-        std::atomic<float>* toneSource[5][4];
+        std::atomic<float>* blendMix[kBlendSlots];
+        std::atomic<float>* matrixAuto = nullptr;
+        std::atomic<float>* toneSource[5][kBlendSlots];
     } rp {};
     double preparedRate = 0.0;
     int preparedBlock = 0;

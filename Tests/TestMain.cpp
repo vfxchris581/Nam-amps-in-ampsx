@@ -3,6 +3,7 @@
 // end-to-end signal chain (controls really change the sound), click-free switching, presets.
 
 #include <filesystem>
+#include <set>
 #include <fstream>
 #include <thread>
 #include <json.hpp>
@@ -613,7 +614,7 @@ TEST (model_blend_mixes_different_amps)
     auto rt = AmpRuntime::build (*lib.find (id), 48000, 256, {}, errors);
     CHECK (errors.empty() && rt->isBlend());
 
-    auto run = [&] (std::array<double, 4> levels) {
+    auto run = [&] (std::array<double, kBlendSlots> levels) {
         auto x = tst::sine (330.0, 48000, 48000, 0.2);
         std::vector<double> y (x.size());
         for (size_t i = 0; i < x.size(); i += 256)
@@ -624,7 +625,7 @@ TEST (model_blend_mixes_different_amps)
         }
         return tst::tone (y, 24000, 16384, 330, 48000);
     };
-    const double onlyA = run ({ 1, 0, 0, 0 }), onlyB = run ({ 0, 1, 0, 0 }), both = run ({ 1, 1, 0, 0 });
+    const double onlyA = run ({ 1, 0 }), onlyB = run ({ 0, 1 }), both = run ({ 1, 1 });
     INFO ("330 Hz: only A %.4f  only B %.4f  50/50 %.4f", onlyA, onlyB, both);
     CHECK (std::abs (tst::db (onlyA / onlyB)) > 0.5);                  // really two different amps
     CHECK (both > std::min (onlyA, onlyB) * 0.5 && both < std::max (onlyA, onlyB) * 1.5);
@@ -684,11 +685,11 @@ TEST (tone_matrix_transfers_bands_between_captures)
     std::vector<std::string> errors;
     auto rt = AmpRuntime::build (*lib.find (id), 48000, 256, {}, errors);
 
-    using L = std::array<double, 4>;
-    const L gainA { 1, 0, 0, 0 };
-    std::array<L, 5> even;    even.fill ({ 1, 1, 0, 0 });
-    std::array<L, 5> ownA;    ownA.fill ({ 1, 0, 0, 0 });
-    std::array<L, 5> bassFromB = ownA;  bassFromB[1] = { 0, 1, 0, 0 };
+    using L = std::array<double, kBlendSlots>;
+    const L gainA { 1, 0, 0, 0, 0, 0, 0, 0 };
+    std::array<L, 5> even;    even.fill ({ 1, 1, 0, 0, 0, 0, 0, 0 });
+    std::array<L, 5> ownA;    ownA.fill ({ 1, 0, 0, 0, 0, 0, 0, 0 });
+    std::array<L, 5> bassFromB = ownA;  bassFromB[1] = { 0, 1, 0, 0, 0, 0, 0, 0 };
 
     // Gain from A with every band from A: nothing to change.
     for (double v : rt->toneCorrection (0, gainA, ownA)) CHECK (std::abs (v) < 1e-9);
@@ -709,6 +710,7 @@ TEST (tone_matrix_transfers_bands_between_captures)
     EngineParameters p;
     p.cabOn = false; p.harmonicsOn = false;
     p.blendMix = gainA;
+    p.matrixAuto = false;
     auto levelAt = [&] (const std::array<L, 5>& src, double f) {
         p.toneSource = src;
         std::vector<double> x = tst::sine (f, 48000, 48000 * 2, 0.02);
@@ -719,6 +721,113 @@ TEST (tone_matrix_transfers_bands_between_captures)
     INFO ("190 Hz through the chain: own bass %.5f, bass from B %.5f (%+.2f dB, expected %+.2f)", before, after,
           tst::db (after / before), expect);
     CHECK (std::abs (tst::db (after / before) - expect) < 1.5);
+}
+
+TEST (eight_slot_loaders_and_auto_mode)
+{
+    const auto dir = tempDir ("slots");
+    const char* srcs[] = { "wavenet_a1_standard.nam", "wavenet.nam", "lstm.nam" };
+    AmpLibrary lib (tempDir ("slots_lib"));
+    std::string err, id;
+    // fill slots 0, 3 and 7 one by one, as the Tone Matrix loaders do (first load creates the blend)
+    const int slots[] = { 0, 3, 7 };
+    for (int i = 0; i < 3; ++i)
+    {
+        const auto f = makeCapture (dir, "M" + std::to_string (i), "X" + std::to_string (i), "Y", "Model " + std::to_string (i), srcs[i]);
+        id = lib.setBlendSlot (id, slots[i], f, "Slots", err);
+        CHECK_MSG (! id.empty(), "%s", err.c_str());
+    }
+    CHECK (lib.find (id)->isBlend && lib.find (id)->channels[0].captures.size() == 3);
+    // replacing slot 3 keeps three models; clearing slot 0 leaves two
+    id = lib.setBlendSlot (id, 3, makeCapture (dir, "M3b", "Z", "Z", "Model 3b", "wavenet.nam"), "", err);
+    CHECK (lib.find (id)->channels[0].captures.size() == 3);
+    CHECK (lib.clearBlendSlot (id, 0));
+    CHECK (lib.find (id)->channels[0].captures.size() == 2);
+    // put a model back in slot 0 and check slot mapping survives a reload
+    id = lib.setBlendSlot (id, 0, makeCapture (dir, "M0b", "Q", "Q", "Model 0b", "wavenet_a1_standard.nam"), "", err);
+    AmpLibrary again (lib.getRoot());
+    std::set<int> got;
+    for (auto& c : again.find (id)->channels[0].captures) got.insert (c.blendSlot);
+    CHECK ((got == std::set<int> { 0, 3, 7 }));
+
+    std::vector<std::string> errors;
+    auto rt = AmpRuntime::build (*again.find (id), 48000, 256, {}, errors);
+    CHECK (errors.empty());
+
+    // Auto: Gain 0 = least distorted capture only, Gain 10 = most distorted only, in between = neighbours.
+    const auto& caps = again.find (id)->channels[0].captures;
+    int cleanest = -1, dirtiest = -1;
+    double lo = 1e9, hi = -1e9;
+    for (auto& c : caps)
+    {
+        const double g = ProfileAnalyzer::featureFor (Control::Gain, *c.analysis);
+        if (g < lo) { lo = g; cleanest = c.blendSlot; }
+        if (g > hi) { hi = g; dirtiest = c.blendSlot; }
+    }
+    KnobCoords k { 0, 5, 5, 5, 5, 5, 5, 5 };
+    auto a0 = rt->autoBlend (0, k);
+    k[0] = 10;
+    auto a10 = rt->autoBlend (0, k);
+    k[0] = 5;
+    auto a5 = rt->autoBlend (0, k);
+    INFO ("gain feature range %.1f .. %.1f dB; cleanest slot %d, dirtiest slot %d", lo, hi, cleanest + 1, dirtiest + 1);
+    CHECK (a0.varies[0] && a0.gain[(size_t) cleanest] == 1.0 && a10.gain[(size_t) dirtiest] == 1.0);
+    double s5 = 0; int nz = 0;
+    for (double w : a5.gain) { s5 += w; if (w > 0) ++nz; }
+    CHECK (std::abs (s5 - 1.0) < 1e-9 && nz >= 1 && nz <= 2);
+
+    // Auto bass: knob 10 borrows the bass of the capture with the most bass -> correction >= 0;
+    // knob 0 borrows the least bass -> correction <= 0, both relative to the same gain source.
+    k = { 5, 5, 10, 5, 5, 5, 5, 5 };
+    auto hiB = rt->autoBlend (0, k);
+    k[2] = 0;
+    auto loB = rt->autoBlend (0, k);
+    const double up = rt->toneCorrection (0, hiB.gain, hiB.bands)[1], down = rt->toneCorrection (0, loB.gain, loB.bands)[1];
+    INFO ("auto bass: knob 10 -> %+.2f dB, knob 0 -> %+.2f dB", up, down);
+    CHECK (up >= -1e-9 && down <= 1e-9 && up - down > 1.0);
+}
+
+TEST (blend_knobs_act_like_real_amp_knobs)
+{
+    // Three different captures in loaders; Auto on. Bass/Treble must give a full amp-like range,
+    // and Gain must take the sound from clean toward distorted.
+    const auto dir = tempDir ("realknobs");
+    AmpLibrary lib (tempDir ("realknobs_lib"));
+    std::string err, id;
+    const char* srcs[] = { "lstm.nam", "wavenet.nam", "wavenet_a1_standard.nam" };
+    for (int i = 0; i < 3; ++i)
+        id = lib.setBlendSlot (id, i, makeCapture (dir, "R" + std::to_string (i), "M" + std::to_string (i), "X", "R" + std::to_string (i), srcs[i]), "Real", err);
+    std::vector<std::string> errors;
+    SignalChain chain;
+    chain.prepare (48000, 256);
+    chain.publishRuntime (AmpRuntime::build (*lib.find (id), 48000, 256, {}, errors));
+    EngineParameters p;
+    p.cabOn = false; p.harmonicsOn = false; p.matrixAuto = true;
+
+    auto level = [&] (Control c, double v, double f, double amp = 0.02) {
+        auto q = p; q.knobs[(size_t) c] = v;
+        auto y = runChain (chain, q, tst::sine (f, 48000, 48000 * 2, amp));
+        return tst::tone (y, y.size() - 16384, 16384, f, 48000);
+    };
+    const double bass = tst::db (level (Control::Bass, 10, 150) / level (Control::Bass, 0, 150));
+    const double treb = tst::db (level (Control::Treble, 10, 3500) / level (Control::Treble, 0, 3500));
+    INFO ("Auto blend, knob 0 -> 10: bass @150 Hz %+.1f dB, treble @3.5 kHz %+.1f dB", bass, treb);
+    CHECK (bass > 6.0);
+    CHECK (treb > 6.0);
+
+    // Gain knob: more harmonic content at 10 than at 0
+    auto thd = [&] (double g) {
+        auto q = p; q.knobs[(size_t) Control::Gain] = g;
+        auto y = runChain (chain, q, tst::sine (220, 48000, 48000 * 2, 0.1));
+        const size_t n = 16384, from = y.size() - n;
+        const double h1 = tst::tone (y, from, n, 220, 48000);
+        double h = 0;
+        for (int k = 2; k <= 6; ++k) { const double a = tst::tone (y, from, n, 220.0 * k, 48000); h += a * a; }
+        return tst::db (std::sqrt (h) / h1);
+    };
+    const double t0 = thd (0), t10 = thd (10);
+    INFO ("Auto blend gain knob: THD %.1f dB at 0 -> %.1f dB at 10", t0, t10);
+    CHECK (t10 > t0 + 3.0);
 }
 
 static double bandLevel (const std::vector<double>& y, double fs, double f)

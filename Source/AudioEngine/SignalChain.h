@@ -60,6 +60,7 @@ public:
     std::atomic<bool> hasAmp { false };
     std::atomic<int> currentRuntimeChannels { 0 };
     std::array<std::atomic<float>, 5> toneCorrectionDb {}; // blend tone transfer per band (UI read-out)
+    std::array<std::array<std::atomic<float>, kBlendSlots>, 6> matrixWeights {}; // effective matrix (rows: gain, res..pres)
 
 private:
     void processMono (double* buf, int n) noexcept;
@@ -94,5 +95,7 @@ private:
     std::vector<float> monoF;
     std::atomic<int> latency { 0 };
     int runtimeLatency = 0;
+    std::array<double, kBlendSlots> effGain {};
+    std::array<std::array<double, kBlendSlots>, 5> effBands {};
 };
 } // namespace namvx

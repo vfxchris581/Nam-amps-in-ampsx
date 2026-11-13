@@ -120,13 +120,14 @@ public:
             if (! blendId.empty())
             {
                 processor->loadAmp (blendId);
+                if (auto* prm = processor->getAPVTS().getParameter (pid::matrixAuto)) prm->setValueNotifyingHost (0.0f);
                 // gain mostly from model 1, bass only from model 2, mids blended 2+3, treble/presence from 3
-                const float gain[] = { 1.0f, 0.25f, 0.0f, 0.0f };
-                const float tone[5][4] = { { 0, 1, 0, 0 }, { 0, 1, 0, 0 }, { 0, 0.6f, 0.4f, 0 }, { 0, 0, 1, 0 }, { 0.3f, 0, 1, 0 } };
+                const float gain[] = { 1.0f, 0.25f, 0.0f, 0.0f, 0, 0, 0, 0 };
+                const float tone[5][kBlendSlots] = { { 0, 1, 0, 0 }, { 0, 1, 0, 0 }, { 0, 0.6f, 0.4f, 0 }, { 0, 0, 1, 0 }, { 0.3f, 0, 1, 0 } };
                 auto setP = [this] (const char* id, float v) {
                     if (auto* prm = processor->getAPVTS().getParameter (id)) prm->setValueNotifyingHost (v); };
-                for (int i = 0; i < 4; ++i) setP (pid::blendMix[i], gain[i]);
-                for (int b = 0; b < 5; ++b) for (int m = 0; m < 4; ++m) setP (pid::toneSource[b][m], tone[b][m]);
+                for (int i = 0; i < kBlendSlots; ++i) setP (pid::blendMix[i], gain[i]);
+                for (int b = 0; b < 5; ++b) for (int m = 0; m < kBlendSlots; ++m) setP (pid::toneSource[b][m], tone[b][m]);
                 startTimer (3000); // runtime build + UI refresh
                 return;
             }
@@ -134,6 +135,7 @@ public:
             return;
         }
         if (phase == 2) { ++phase; playAudio(); startTimer (400); return; }
+        if (phase == 10) { autoShot(); finish(); return; }
         // phase 3: blend shots
         auto shot = [this] (int tab, const char* file) {
             editor->showTab (tab);
@@ -146,9 +148,28 @@ public:
             std::printf ("wrote %s\n", f.getFullPathName().toRawUTF8());
         };
         shot (NamVXEditor::tabAmp, "namvx-blend.png");
-        shot (NamVXEditor::tabToneMatrix, "namvx-tone-matrix.png");
+        shot (NamVXEditor::tabToneMatrix, "namvx-tone-matrix-manual.png");
         shot (NamVXEditor::tabLibrary, "namvx-library.png");
-        finish();
+        if (auto* prm = processor->getAPVTS().getParameter (pid::matrixAuto)) prm->setValueNotifyingHost (1.0f);
+        auto setK = [this] (const char* id, float v) {
+            if (auto* prm = processor->getAPVTS().getParameter (id)) prm->setValueNotifyingHost (prm->convertTo0to1 (v)); };
+        setK ("gain", 7.0f); setK ("bass", 8.0f); setK ("middle", 3.0f); setK ("treble", 6.5f); setK ("presence", 4.0f); setK ("resonance", 9.0f);
+        playAudio();
+        juce::Thread::sleep (50);
+        startTimer (500);
+        phase = 10;
+        return;
+    }
+
+    void autoShot()
+    {
+        editor->showTab (NamVXEditor::tabToneMatrix);
+        auto img = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.5f);
+        auto f = outDir.getChildFile ("namvx-tone-matrix.png");
+        f.deleteFile();
+        juce::PNGImageFormat png;
+        if (auto os = f.createOutputStream()) png.writeImageToStream (img, *os);
+        std::printf ("wrote %s\n", f.getFullPathName().toRawUTF8());
     }
 
     void playAudio()

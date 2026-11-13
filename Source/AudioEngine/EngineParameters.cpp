@@ -55,10 +55,11 @@ const std::vector<ParamSpec>& parameterSpecs()
         f (pid::ir2Pan, "IR 2 Pan", -1.0, 1.0, 0.0);
         b (pid::ir2Invert, "IR 2 Polarity", false);
         f (pid::ir2Delay, "IR 2 Delay", 0.0, 10.0, 0.0, "ms");
-        for (int i = 0; i < 4; ++i)
+        b (pid::matrixAuto, "Tone Matrix Auto", true);
+        for (int i = 0; i < kBlendSlots; ++i)
             f (pid::blendMix[i], "Gain Source " + std::to_string (i + 1), 0.0, 1.0, 1.0);
         for (int b = 0; b < 5; ++b)
-            for (int m = 0; m < 4; ++m)
+            for (int m = 0; m < kBlendSlots; ++m)
                 f (pid::toneSource[b][m], std::string (pid::toneBandName[b]) + " Source " + std::to_string (m + 1), 0.0, 1.0, 1.0);
         return s;
     }();

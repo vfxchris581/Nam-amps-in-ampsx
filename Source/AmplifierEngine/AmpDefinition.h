@@ -21,6 +21,7 @@ struct CaptureEntry
     KnobCoords coords = unknownCoords();
     std::array<CoordSource, kNumControls> source {};
     double trimDb = 0.0;            // manual level calibration
+    int blendSlot = -1;             // blends: Tone Matrix column (0..7)
     bool enabled = true;
     std::optional<CaptureAnalysis> analysis;
 };
@@ -45,7 +46,7 @@ struct AmpDefinition
     /** A blend mixes NAM models of *different* amps at user-set levels (Mix knobs) instead of
         interpolating captures of one amp by knob position. */
     bool isBlend = false;
-    static constexpr int kMaxBlendModels = 4;
+    static constexpr int kMaxBlendModels = 8;
 
     int totalCaptures() const;
     int findChannel (const std::string& name) const; // -1 if none (case/format-insensitive)

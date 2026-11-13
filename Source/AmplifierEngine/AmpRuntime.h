@@ -41,6 +41,18 @@ public:
     void setBlendLevels (int channel, const std::array<double, AmpDefinition::kMaxBlendModels>& levels) noexcept;
     bool isBlend() const noexcept { return blend; }
 
+    /** Auto mode: the amp knobs drive the blend. Each knob sweeps across the loaded captures sorted
+        by how much of that quality they have (Gain: distortion; EQ knobs: band level). All arrays are
+        indexed by slot. 'varies' tells which controls the captures actually differ in (row 0 = gain,
+        1..5 = resonance, bass, middle, treble, presence); the others are left to the DSP knobs. */
+    struct AutoBlend
+    {
+        std::array<double, AmpDefinition::kMaxBlendModels> gain {};
+        std::array<std::array<double, AmpDefinition::kMaxBlendModels>, 5> bands {};
+        std::array<bool, 6> varies {};
+    };
+    AutoBlend autoBlend (int channel, const KnobCoords& knobs) const noexcept;
+
     /** Blend amps: per-band correction (dB) that gives the gain-source mix the tonal balance chosen
         per band. gainLevels = audio mix of the models; bandLevels[band][model] = source mix per band. */
     std::array<double, 5> toneCorrection (int channel, const std::array<double, AmpDefinition::kMaxBlendModels>& gainLevels,
@@ -58,6 +70,8 @@ private:
         KnobCoords baseline {};   // value used for uncovered controls
         IntDelay pad;             // equalises latency across channels
         std::vector<std::array<double, 5>> bands; // analysed tonal balance per source (dB)
+        std::vector<int> slot;                    // blends: Tone Matrix column of each source
+        std::vector<double> gainFeature;          // distortion measure per source (analysis)
     };
     std::vector<Channel> channels;
     std::string ampId;

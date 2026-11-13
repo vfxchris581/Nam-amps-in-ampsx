@@ -4,34 +4,46 @@
 
 namespace namvx
 {
-/** Blend amps as one whole amp: for Gain and each EQ band, choose (and mix) which NAM captures
-    it comes from. Rows = controls, columns = the blend's models. */
+/** Eight NAM loaders that play as one amp.
+    Top: the eight loader slots. Middle: a real amp faceplate (Gain, Volume, Bass, Middle, Treble,
+    Presence, Resonance, Master) - in Auto mode turning these blends the loaded captures the way a
+    real amp's knobs would. Bottom: the blend matrix (rows = controls, columns = slots) showing what
+    the knobs are doing; with Auto off you drag it by hand. */
 class ToneMatrixPanel : public juce::Component, private juce::Timer
 {
 public:
     explicit ToneMatrixPanel (NamVXProcessor& p);
+    ~ToneMatrixPanel() override;
     void refresh();
     void paint (juce::Graphics&) override;
     void resized() override;
 
-private:
-    void timerCallback() override;
-    void setRow (int row, int soloModel); // soloModel < 0 = even mix
-    juce::String paramId (int row, int model) const;
+    static constexpr int kRows = 6; // Gain, Resonance, Bass, Middle, Treble, Presence
+    static constexpr int kSlots = kBlendSlots;
 
-    static constexpr int kRows = 6;      // Gain, Resonance, Bass, Middle, Treble, Presence
-    static constexpr int kModels = 4;
+private:
+    struct CellMouse;
+    void timerCallback() override;
+    void setRow (int row, int soloSlot);
+    void showCellMenu (int row, int slot);
+    void applyAutoState();
+    juce::String paramId (int row, int slot) const;
 
     NamVXProcessor& proc;
-    juce::Slider cells[kRows][kModels];
-    std::unique_ptr<APVTS::SliderAttachment> attach[kRows][kModels];
-    juce::TextButton solo[kRows][kModels];
-    juce::TextButton even[kRows];
-    juce::Label modelNames[kModels];
-    juce::Label readout[kRows];
-    juce::TextButton resetAll { "Reset to even blend" };
-    int numModels = 0;
-    bool isBlend = false;
-    juce::Rectangle<int> area, grid;
+    std::vector<std::unique_ptr<Knob>> ampKnobs;
+    juce::Slider cells[kRows][kSlots];
+    std::unique_ptr<APVTS::SliderAttachment> attach[kRows][kSlots];
+    std::unique_ptr<CellMouse> mouse[kRows][kSlots];
+    juce::TextButton load[kSlots], clear[kSlots];
+    juce::Label names[kSlots], readout[kRows];
+    Toggle autoToggle;
+    juce::TextButton resetAll { "Even blend" };
+    std::unique_ptr<juce::FileChooser> chooser;
+
+    bool loaded[kSlots] {};
+    int numLoaded = 0;
+    bool autoMode = true, lastAuto = true;
+    juce::Rectangle<int> slotsArea, plate, matrixArea, grid;
+    int labelW = 120, readW = 66;
 };
 } // namespace namvx

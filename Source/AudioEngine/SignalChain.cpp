@@ -160,7 +160,36 @@ void SignalChain::processMono (double* x, int n) noexcept
     {
         res = rt->setKnobs (channel, p.knobs);
         if (chanFade > 0 && prevChannel >= 0) rt->setKnobs (prevChannel, p.knobs);
-        if (rt->isBlend()) rt->setBlendLevels (channel, p.blendMix);
+        if (rt->isBlend())
+        {
+            // Effective tone matrix: manual knobs, or derived from the amp knobs in Auto mode.
+            effGain = p.blendMix;
+            effBands = p.toneSource;
+            if (p.matrixAuto)
+            {
+                const auto ab = rt->autoBlend (channel, p.knobs);
+                effGain = ab.gain;
+                effBands = ab.bands;
+                // Real-amp knob law: every knob always spans a full amp range around noon.
+                // The captures supply the character; the DSP tone stack supplies whatever range
+                // the captures don't (desired = (knob-5) units, minus what the transfer achieved).
+                const auto corr = rt->toneCorrection (channel, effGain, effBands);
+                const auto& kn = p.knobs;
+                res.resonance = (kn[(size_t) Control::Resonance] - 5.0) - corr[0] / ToneResidual::kResonanceDb;
+                res.bass      = (kn[(size_t) Control::Bass] - 5.0)      - corr[1] / ToneResidual::kBassDb;
+                res.middle    = (kn[(size_t) Control::Middle] - 5.0)    - corr[2] / ToneResidual::kMidDb;
+                res.treble    = (kn[(size_t) Control::Treble] - 5.0)    - corr[3] / ToneResidual::kTrebleDb;
+                res.presence  = (kn[(size_t) Control::Presence] - 5.0)  - corr[4] / ToneResidual::kPresenceDb;
+                // Gain: crossfade clean -> dirty captures AND push their input like a preamp gain pot.
+                res.gain = (kn[(size_t) Control::Gain] - 5.0) * (ab.varies[0] ? 0.55 : 1.0);
+            }
+            rt->setBlendLevels (channel, effGain);
+            for (int m = 0; m < kBlendSlots; ++m)
+            {
+                matrixWeights[0][(size_t) m] = (float) effGain[(size_t) m];
+                for (int b = 0; b < 5; ++b) matrixWeights[(size_t) b + 1][(size_t) m] = (float) effBands[(size_t) b][(size_t) m];
+            }
+        }
     }
     else
     {
@@ -214,7 +243,7 @@ void SignalChain::processMono (double* x, int n) noexcept
     // ---- blend tone transfer: each band takes the balance of its chosen source captures --------
     ToneMatch::Bands corr {};
     if (rt != nullptr && rt->isBlend())
-        corr = rt->toneCorrection (channel, p.blendMix, p.toneSource);
+        corr = rt->toneCorrection (channel, effGain, effBands);
     for (int b = 0; b < 5; ++b) toneCorrectionDb[(size_t) b] = (float) corr[(size_t) b];
     toneMatch.setCorrectionDb (corr);
     toneMatch.process (x, n);

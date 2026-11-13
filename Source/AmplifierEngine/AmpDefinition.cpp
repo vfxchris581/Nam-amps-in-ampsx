@@ -97,6 +97,7 @@ nlohmann::json toJson (const AmpDefinition& a)
             for (auto s : c.source) src.push_back ((int) s);
             e["coordSource"] = src;
             e["trimDb"] = c.trimDb;
+            e["blendSlot"] = c.blendSlot;
             e["enabled"] = c.enabled;
             if (c.analysis && c.analysis->valid)
             {
@@ -155,6 +156,7 @@ AmpDefinition ampFromJson (const nlohmann::json& j)
                         for (size_t i = 0; i < c.source.size() && i < e["coordSource"].size(); ++i)
                             c.source[i] = (CoordSource) e["coordSource"][i].get<int>();
                     c.trimDb = get<double> (e, "trimDb", 0.0);
+                    c.blendSlot = get<int> (e, "blendSlot", -1);
                     c.enabled = get<bool> (e, "enabled", true);
                     if (e.contains ("analysis") && e["analysis"].is_object())
                     {

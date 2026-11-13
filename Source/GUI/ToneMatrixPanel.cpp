@@ -5,96 +5,167 @@ namespace namvx
 namespace
 {
 const char* rowNames[] = { "Gain", "Resonance", "Bass", "Middle", "Treble", "Presence" };
-const char* rowHelp[] = { "distortion, compression & feel", "60 - 120 Hz", "120 - 300 Hz", "300 Hz - 1.5 kHz",
-                          "1.5 - 4 kHz", "4 - 8 kHz" };
 } // namespace
 
-juce::String ToneMatrixPanel::paramId (int row, int model) const
+struct ToneMatrixPanel::CellMouse : juce::MouseListener
 {
-    return row == 0 ? juce::String (pid::blendMix[model]) : juce::String (pid::toneSource[row - 1][model]);
+    CellMouse (ToneMatrixPanel& o, int r, int s) : owner (o), row (r), slot (s) {}
+    void mouseDown (const juce::MouseEvent& e) override { if (e.mods.isPopupMenu()) owner.showCellMenu (row, slot); }
+    ToneMatrixPanel& owner;
+    int row, slot;
+};
+
+juce::String ToneMatrixPanel::paramId (int row, int slot) const
+{
+    return row == 0 ? juce::String (pid::blendMix[slot]) : juce::String (pid::toneSource[row - 1][slot]);
 }
 
-ToneMatrixPanel::ToneMatrixPanel (NamVXProcessor& p) : proc (p)
+ToneMatrixPanel::ToneMatrixPanel (NamVXProcessor& p)
+    : proc (p), autoToggle (p.getAPVTS(), pid::matrixAuto, "Auto (knobs blend the captures)")
 {
+    for (int k = 0; k < kNumControls; ++k)
+    {
+        ampKnobs.push_back (std::make_unique<Knob> (p.getAPVTS(), controlId ((Control) k), controlName ((Control) k), true));
+        addAndMakeVisible (*ampKnobs.back());
+    }
     for (int r = 0; r < kRows; ++r)
     {
-        for (int m = 0; m < kModels; ++m)
+        for (int s = 0; s < kSlots; ++s)
         {
-            auto& s = cells[r][m];
-            s.setSliderStyle (juce::Slider::LinearHorizontal);
-            s.setTextBoxStyle (juce::Slider::TextBoxRight, false, 44, 20);
-            s.setColour (juce::Slider::textBoxTextColourId, ui::textDim);
-            s.textFromValueFunction = [] (double v) { return juce::String (juce::roundToInt (v * 100)) + "%"; };
-            attach[r][m] = std::make_unique<APVTS::SliderAttachment> (p.getAPVTS(), paramId (r, m), s);
-            addChildComponent (s);
-
-            auto& b = solo[r][m];
-            b.setButtonText ("only");
-            b.setTooltip ("Take this control entirely from this capture");
-            b.onClick = [this, r, m] { setRow (r, m); };
-            addChildComponent (b);
+            auto& c = cells[r][s];
+            c.setSliderStyle (juce::Slider::LinearBar);
+            c.setColour (juce::Slider::trackColourId, ui::amber.withAlpha (0.75f));
+            c.setColour (juce::Slider::backgroundColourId, ui::panelHi);
+            c.setColour (juce::Slider::textBoxTextColourId, ui::text);
+            c.setColour (juce::Slider::textBoxOutlineColourId, ui::line);
+            c.textFromValueFunction = [] (double v) { return juce::String (juce::roundToInt (v * 100)) + "%"; };
+            c.setDoubleClickReturnValue (true, 1.0);
+            attach[r][s] = std::make_unique<APVTS::SliderAttachment> (p.getAPVTS(), paramId (r, s), c);
+            mouse[r][s] = std::make_unique<CellMouse> (*this, r, s);
+            c.addMouseListener (mouse[r][s].get(), true);
+            addAndMakeVisible (c);
         }
-        even[r].setButtonText ("even");
-        even[r].onClick = [this, r] { setRow (r, -1); };
-        addChildComponent (even[r]);
-        readout[r].setFont (ui::semi (12.5f));
-        readout[r].setJustificationType (juce::Justification::centredRight);
-        addChildComponent (readout[r]);
+        readout[r].setFont (ui::semi (11.5f));
+        readout[r].setJustificationType (juce::Justification::centred);
+        addAndMakeVisible (readout[r]);
     }
-    for (auto& l : modelNames)
+    for (int s = 0; s < kSlots; ++s)
     {
-        l.setFont (ui::semi (13.0f));
-        l.setColour (juce::Label::textColourId, ui::text);
-        l.setJustificationType (juce::Justification::centred);
-        addChildComponent (l);
+        names[s].setFont (ui::semi (11.0f));
+        names[s].setJustificationType (juce::Justification::centred);
+        names[s].setMinimumHorizontalScale (0.7f);
+        addAndMakeVisible (names[s]);
+        load[s].onClick = [this, s] {
+            chooser = std::make_unique<juce::FileChooser> ("Load a NAM capture into slot " + juce::String (s + 1), juce::File(), "*.nam;*.NAM");
+            chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                                  [this, s] (const juce::FileChooser& fc) {
+                                      if (fc.getResult().existsAsFile()) proc.loadBlendSlot (s, fc.getResult());
+                                  });
+        };
+        addAndMakeVisible (load[s]);
+        clear[s].setButtonText (juce::String::fromUTF8 ("\xc3\x97"));
+        clear[s].setTooltip ("Empty this slot");
+        clear[s].onClick = [this, s] { proc.clearBlendSlot (s); };
+        addAndMakeVisible (clear[s]);
     }
+    addAndMakeVisible (autoToggle);
     resetAll.onClick = [this] { for (int r = 0; r < kRows; ++r) setRow (r, -1); };
-    addChildComponent (resetAll);
+    addAndMakeVisible (resetAll);
     refresh();
-    startTimerHz (10);
+    startTimerHz (15);
 }
 
-void ToneMatrixPanel::setRow (int row, int soloModel)
+ToneMatrixPanel::~ToneMatrixPanel()
 {
-    for (int m = 0; m < kModels; ++m)
-        if (auto* prm = proc.getAPVTS().getParameter (paramId (row, m)))
-            prm->setValueNotifyingHost (soloModel < 0 || soloModel == m ? 1.0f : 0.0f);
+    for (int r = 0; r < kRows; ++r)
+        for (int s = 0; s < kSlots; ++s) cells[r][s].removeMouseListener (mouse[r][s].get());
+}
+
+void ToneMatrixPanel::setRow (int row, int soloSlot)
+{
+    for (int s = 0; s < kSlots; ++s)
+        if (auto* prm = proc.getAPVTS().getParameter (paramId (row, s)))
+            prm->setValueNotifyingHost (soloSlot < 0 ? 1.0f : (s == soloSlot ? 1.0f : 0.0f));
+}
+
+void ToneMatrixPanel::showCellMenu (int row, int slot)
+{
+    juce::PopupMenu m;
+    m.addSectionHeader (juce::String (rowNames[row]) + " - slot " + juce::String (slot + 1));
+    m.addItem (1, "Take " + juce::String (rowNames[row]).toLowerCase() + " only from this slot", loaded[slot] && ! autoMode);
+    m.addItem (2, "Even blend for this row", ! autoMode);
+    m.addItem (3, "Use this slot for everything", loaded[slot] && ! autoMode);
+    if (autoMode) m.addItem (4, "Turn Auto off to set the blend by hand");
+    m.showMenuAsync (juce::PopupMenu::Options(), [this, row, slot] (int r) {
+        if (r == 1) setRow (row, slot);
+        if (r == 2) setRow (row, -1);
+        if (r == 3) for (int i = 0; i < kRows; ++i) setRow (i, slot);
+        if (r == 4) if (auto* prm = proc.getAPVTS().getParameter (pid::matrixAuto)) prm->setValueNotifyingHost (0.0f);
+    });
 }
 
 void ToneMatrixPanel::refresh()
 {
     const auto* amp = proc.getCurrentAmp();
-    isBlend = amp != nullptr && amp->isBlend && ! amp->channels.empty();
-    numModels = 0;
-    if (isBlend)
-        for (auto& cap : amp->channels[0].captures)
-        {
-            if (! cap.enabled || numModels >= kModels) continue;
-            modelNames[numModels].setText (cap.meta.name.empty() ? cap.meta.fileName : cap.meta.name, juce::dontSendNotification);
-            ++numModels;
-        }
-    for (int m = 0; m < kModels; ++m) modelNames[m].setVisible (isBlend && m < numModels);
-    for (int r = 0; r < kRows; ++r)
+    const bool blend = amp != nullptr && amp->isBlend && ! amp->channels.empty();
+    numLoaded = 0;
+    for (int s = 0; s < kSlots; ++s)
     {
-        for (int m = 0; m < kModels; ++m)
+        loaded[s] = false;
+        juce::String n;
+        if (blend)
         {
-            cells[r][m].setVisible (isBlend && m < numModels);
-            solo[r][m].setVisible (isBlend && m < numModels);
+            int idx = 0;
+            for (auto& cap : amp->channels[0].captures)
+            {
+                if ((cap.blendSlot >= 0 ? cap.blendSlot : idx) == s)
+                {
+                    loaded[s] = true;
+                    n = cap.meta.name.empty() ? cap.meta.fileName : cap.meta.name;
+                }
+                ++idx;
+            }
         }
-        even[r].setVisible (isBlend);
-        readout[r].setVisible (isBlend && r > 0);
+        if (loaded[s]) ++numLoaded;
+        names[s].setText (loaded[s] ? n : juce::String ("Slot ") + juce::String (s + 1), juce::dontSendNotification);
+        names[s].setColour (juce::Label::textColourId, loaded[s] ? ui::text : ui::textDim);
+        load[s].setButtonText (loaded[s] ? "Replace" : "Load NAM");
+        clear[s].setVisible (loaded[s]);
+        for (int r = 0; r < kRows; ++r) cells[r][s].setAlpha (loaded[s] ? 1.0f : 0.2f);
     }
-    resetAll.setVisible (isBlend);
+    applyAutoState();
     resized();
     repaint();
 }
 
+void ToneMatrixPanel::applyAutoState()
+{
+    autoMode = proc.getAPVTS().getRawParameterValue (pid::matrixAuto)->load() > 0.5f;
+    for (int r = 0; r < kRows; ++r)
+        for (int s = 0; s < kSlots; ++s) cells[r][s].setEnabled (! autoMode && loaded[s]);
+    resetAll.setEnabled (! autoMode);
+    if (! autoMode && lastAuto) // back to manual: show each cell's own parameter again
+        for (int r = 0; r < kRows; ++r)
+            for (int s = 0; s < kSlots; ++s)
+                attach[r][s] = std::make_unique<APVTS::SliderAttachment> (proc.getAPVTS(), paramId (r, s), cells[r][s]);
+    lastAuto = autoMode;
+}
+
 void ToneMatrixPanel::timerCallback()
 {
-    if (! isBlend) return;
+    if ((proc.getAPVTS().getRawParameterValue (pid::matrixAuto)->load() > 0.5f) != autoMode)
+    {
+        applyAutoState();
+        repaint();
+    }
+    auto& ch = proc.getChain();
+    if (autoMode && numLoaded > 0)
+        for (int r = 0; r < kRows; ++r)
+            for (int s = 0; s < kSlots; ++s)
+                if (loaded[s]) cells[r][s].setValue (ch.matrixWeights[(size_t) r][(size_t) s].load(), juce::dontSendNotification);
     for (int r = 1; r < kRows; ++r)
     {
-        const float db = proc.getChain().toneCorrectionDb[(size_t) (r - 1)].load();
+        const float db = numLoaded > 0 ? ch.toneCorrectionDb[(size_t) (r - 1)].load() : 0.0f;
         const auto txt = std::abs (db) < 0.05f ? juce::String ("0.0 dB") : (db > 0 ? "+" : "") + juce::String (db, 1) + " dB";
         readout[r].setColour (juce::Label::textColourId, std::abs (db) < 0.05f ? ui::textDim : ui::amber);
         if (readout[r].getText() != txt) readout[r].setText (txt, juce::dontSendNotification);
@@ -103,69 +174,78 @@ void ToneMatrixPanel::timerCallback()
 
 void ToneMatrixPanel::paint (juce::Graphics& g)
 {
-    g.fillAll (ui::bg);
-    ui::drawPanel (g, area.toFloat(), "Tone matrix  -  build one amp from all your NAM captures");
-    auto r = area.reduced (16, 12);
-    r.removeFromTop (24);
-    g.setFont (ui::body (12.5f));
-    g.setColour (ui::textDim);
-    if (! isBlend)
-    {
-        g.drawFittedText ("The tone matrix works on model blends. Go to Library > \"New blend from NAM models...\", pick 2-4 captures "
-                          "(any amps), and every control here can then take its character from any of them: for example the gain "
-                          "of capture A, the bass of capture B and the mids of capture C.",
-                          r.reduced (0, 20).toNearestInt(), juce::Justification::centredTop, 4);
-        return;
-    }
-    g.drawFittedText ("Gain picks which captures make the sound (distortion, compression, feel). Each EQ row gives that band the "
-                      "tonal balance of the captures you choose, transferred onto the gain sound as one phase-coherent signal. "
-                      "The amp knobs still work on top.", r.removeFromTop (34).toNearestInt(), juce::Justification::topLeft, 2);
+    ui::drawTolex (g, getLocalBounds().toFloat());
 
-    // row labels + separators
-    const int rowH = grid.getHeight() / (kRows + 1);
-    for (int row = 0; row < kRows; ++row)
+    // loader rack
+    ui::drawPanel (g, slotsArea.toFloat(), "NAM loaders");
+    // amp faceplate
+    ui::drawFaceplate (g, plate.toFloat());
+    g.setColour (ui::ink.withAlpha (0.65f));
+    g.setFont (ui::semi (11.0f).withExtraKerningFactor (0.22f));
+    g.drawText (numLoaded > 0 ? juce::String (numLoaded) + (numLoaded == 1 ? " CAPTURE" : " CAPTURES") + " PLAYING AS ONE AMP"
+                              : juce::String ("LOAD CAPTURES ABOVE - THEY BECOME ONE AMP"),
+                plate.reduced (40, 0).removeFromTop (30).translated (0, 6), juce::Justification::centred);
+
+    // blend matrix
+    ui::drawPanel (g, matrixArea.toFloat(), autoMode ? "Blend matrix - set by the amp knobs" : "Blend matrix - manual");
+    const int rowH = grid.getHeight() / kRows;
+    for (int r = 0; r < kRows; ++r)
     {
-        auto lr = juce::Rectangle<int> (grid.getX(), grid.getY() + rowH * (row + 1), 170, rowH);
-        g.setColour (row == 0 ? ui::gold : ui::text);
-        g.setFont (ui::semi (14.0f));
-        g.drawText (juce::String (rowNames[row]).toUpperCase(), lr.removeFromTop (rowH / 2 + 4), juce::Justification::bottomLeft);
-        g.setColour (ui::textDim);
-        g.setFont (ui::body (11.5f));
-        g.drawText (rowHelp[row], lr, juce::Justification::topLeft);
-        g.setColour (ui::line);
-        g.drawHorizontalLine (grid.getY() + rowH * (row + 1), (float) grid.getX(), (float) grid.getRight());
+        auto lr = juce::Rectangle<int> (grid.getX(), grid.getY() + r * rowH, labelW, rowH);
+        g.setColour (r == 0 ? ui::gold : ui::text);
+        g.setFont (ui::semi (12.5f));
+        g.drawText (juce::String (rowNames[r]).toUpperCase(), lr, juce::Justification::centredLeft);
     }
-    g.setColour (ui::textDim);
-    g.setFont (ui::semi (10.5f).withExtraKerningFactor (0.15f));
-    g.drawText ("APPLIED", juce::Rectangle<int> (grid.getRight() - 80, grid.getY(), 80, rowH), juce::Justification::centredRight);
 }
 
 void ToneMatrixPanel::resized()
 {
-    area = getLocalBounds().reduced (24, 18);
-    auto r = area.reduced (16, 12);
-    r.removeFromTop (24 + 34 + 10);
-    resetAll.setBounds (r.removeFromBottom (34).removeFromRight (190));
-    r.removeFromBottom (8);
-    grid = r;
-    if (! isBlend || numModels == 0) return;
+    auto r = getLocalBounds().reduced (24, 12);
+    slotsArea = r.removeFromTop (92);
+    r.removeFromTop (12);
+    plate = r.removeFromTop (230);
+    r.removeFromTop (12);
+    matrixArea = r;
 
-    const int rowH = grid.getHeight() / (kRows + 1);
-    const int labelW = 170, readW = 80, evenW = 58;
-    const int colW = (grid.getWidth() - labelW - readW - evenW - 12) / numModels;
-    for (int m = 0; m < numModels; ++m)
-        modelNames[m].setBounds (grid.getX() + labelW + m * colW, grid.getY(), colW, rowH);
-    for (int row = 0; row < kRows; ++row)
+    // loaders
     {
-        const int y = grid.getY() + rowH * (row + 1);
-        for (int m = 0; m < numModels; ++m)
+        auto a = slotsArea.reduced (14, 10);
+        a.removeFromTop (22);
+        const int w = a.getWidth() / kSlots;
+        for (int s = 0; s < kSlots; ++s)
         {
-            auto cell = juce::Rectangle<int> (grid.getX() + labelW + m * colW, y, colW, rowH).reduced (8, rowH / 2 - 14);
-            solo[row][m].setBounds (cell.removeFromRight (46).reduced (0, 3));
-            cells[row][m].setBounds (cell);
+            auto col = juce::Rectangle<int> (a.getX() + s * w, a.getY(), w, a.getHeight()).reduced (4, 0);
+            names[s].setBounds (col.removeFromTop (26));
+            auto b = col.removeFromTop (26);
+            clear[s].setBounds (b.removeFromRight (26));
+            b.removeFromRight (3);
+            load[s].setBounds (b);
         }
-        even[row].setBounds (grid.getX() + labelW + numModels * colW + 6, y + rowH / 2 - 12, evenW, 24);
-        readout[row].setBounds (grid.getRight() - readW, y, readW, rowH);
+    }
+    // faceplate knobs
+    {
+        auto row = plate.reduced (28, 0).withTrimmedTop (36).withTrimmedBottom (10);
+        const int kw = row.getWidth() / kNumControls;
+        for (int k = 0; k < kNumControls; ++k) ampKnobs[(size_t) k]->setBounds (row.removeFromLeft (kw).reduced (6, 0));
+    }
+    // matrix
+    {
+        auto a = matrixArea.reduced (14, 10);
+        auto head = a.removeFromTop (24);
+        resetAll.setBounds (head.removeFromRight (110).withTrimmedBottom (2));
+        head.removeFromRight (10);
+        autoToggle.setBounds (head.removeFromRight (260));
+        a.removeFromTop (4);
+        grid = a;
+        const int rowH = grid.getHeight() / kRows;
+        const int colW = (grid.getWidth() - labelW - readW) / kSlots;
+        for (int row = 0; row < kRows; ++row)
+        {
+            for (int s = 0; s < kSlots; ++s)
+                cells[row][s].setBounds (juce::Rectangle<int> (grid.getX() + labelW + s * colW, grid.getY() + row * rowH, colW, rowH)
+                                             .reduced (4, 3));
+            readout[row].setBounds (grid.getRight() - readW, grid.getY() + row * rowH, readW, rowH);
+        }
     }
 }
 } // namespace namvx

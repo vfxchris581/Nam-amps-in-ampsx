@@ -82,8 +82,9 @@ void NamVXProcessor::init (const juce::File& root)
            raw (pid::cabAutoAlign), raw (pid::cabBlend), raw (pid::cabLevel), raw (pid::ir1On), raw (pid::ir1Level),
            raw (pid::ir1Pan), raw (pid::ir1Invert), raw (pid::ir1Delay), raw (pid::ir2On), raw (pid::ir2Level),
            raw (pid::ir2Pan), raw (pid::ir2Invert), raw (pid::ir2Delay), {} };
-    for (int i = 0; i < 4; ++i) rp.blendMix[i] = raw (pid::blendMix[i]);
-    for (int b = 0; b < 5; ++b) for (int m = 0; m < 4; ++m) rp.toneSource[b][m] = raw (pid::toneSource[b][m]);
+    rp.matrixAuto = raw (pid::matrixAuto);
+    for (int i = 0; i < kBlendSlots; ++i) rp.blendMix[i] = raw (pid::blendMix[i]);
+    for (int b = 0; b < 5; ++b) for (int m = 0; m < kBlendSlots; ++m) rp.toneSource[b][m] = raw (pid::toneSource[b][m]);
     apvts.addParameterListener (pid::channel, this);
     chain.prepare (48000.0, 512);
     setStatus (library->getAmps().empty() ? "Drop NAM captures of one amp to build your first virtual amplifier"
@@ -136,8 +137,9 @@ void NamVXProcessor::snapshotParameters (EngineParameters& p) const noexcept
     p.cabBlend = f (rp.cabBlend); p.cabLevelDb = f (rp.cabLevel);
     p.ir1 = { b (rp.ir1On), f (rp.ir1Level), f (rp.ir1Pan), f (rp.ir1Delay), b (rp.ir1Invert) };
     p.ir2 = { b (rp.ir2On), f (rp.ir2Level), f (rp.ir2Pan), f (rp.ir2Delay), b (rp.ir2Invert) };
-    for (int i = 0; i < 4; ++i) p.blendMix[(size_t) i] = f (rp.blendMix[i]);
-    for (int b = 0; b < 5; ++b) for (int m = 0; m < 4; ++m) p.toneSource[(size_t) b][(size_t) m] = f (rp.toneSource[b][m]);
+    p.matrixAuto = b (rp.matrixAuto);
+    for (int i = 0; i < kBlendSlots; ++i) p.blendMix[(size_t) i] = f (rp.blendMix[i]);
+    for (int b = 0; b < 5; ++b) for (int m = 0; m < kBlendSlots; ++m) p.toneSource[(size_t) b][(size_t) m] = f (rp.toneSource[b][m]);
 }
 
 template <typename T>
@@ -304,15 +306,51 @@ void NamVXProcessor::createBlend (const juce::String& name, const juce::StringAr
             importing = false;
             library->reload();
             if (id.empty()) { setStatus ("Blend not created: " + juce::String (error)); return; }
-            for (int i = 0; i < 4; ++i)
+            for (int i = 0; i < kBlendSlots; ++i)
                 if (auto* prm = apvts.getParameter (pid::blendMix[i])) prm->setValueNotifyingHost (1.0f);
             for (int b = 0; b < 5; ++b)
-                for (int m = 0; m < 4; ++m)
+                for (int m = 0; m < kBlendSlots; ++m)
                     if (auto* prm = apvts.getParameter (pid::toneSource[b][m])) prm->setValueNotifyingHost (1.0f);
             loadAmp (id);
             setStatus ("Blend \"" + juce::String (blendName) + "\" created - set the mix on the Amp page");
         });
     });
+}
+
+void NamVXProcessor::loadBlendSlot (int slot, const juce::File& namFile)
+{
+    if (importing.exchange (true)) return;
+    const auto* amp = getCurrentAmp();
+    const std::string ampId = (amp != nullptr && amp->isBlend) ? amp->id : std::string();
+    const auto root = library->getRoot();
+    const auto file = std::filesystem::path (namFile.getFullPathName().toStdString());
+    setStatus ("Analysing " + namFile.getFileNameWithoutExtension() + " for slot " + juce::String (slot + 1) + "...");
+    workers.addJob ([this, slot, ampId, root, file] {
+        AmpLibrary worker (root);
+        std::string error;
+        const auto id = worker.setBlendSlot (ampId, slot, file, "New Blend", error);
+        juce::MessageManager::callAsync ([this, id, error, slot, ampId] {
+            importing = false;
+            library->reload();
+            if (id.empty()) { setStatus ("Slot " + juce::String (slot + 1) + " not loaded: " + juce::String (error)); return; }
+            if (ampId.empty()) // fresh blend: start every knob of the new slot up, others at their defaults
+                for (int m = 0; m < kBlendSlots; ++m)
+                {
+                    if (auto* prm = apvts.getParameter (pid::blendMix[m])) prm->setValueNotifyingHost (1.0f);
+                    for (int b = 0; b < 5; ++b)
+                        if (auto* prm = apvts.getParameter (pid::toneSource[b][m])) prm->setValueNotifyingHost (1.0f);
+                }
+            loadAmp (id);
+            setStatus ("Slot " + juce::String (slot + 1) + " loaded");
+        });
+    });
+}
+
+void NamVXProcessor::clearBlendSlot (int slot)
+{
+    const auto* amp = getCurrentAmp();
+    if (amp == nullptr || ! amp->isBlend) return;
+    if (library->clearBlendSlot (amp->id, slot)) { rebuildRuntime(); sendChangeMessage(); }
 }
 
 void NamVXProcessor::reanalyseCurrentAmp()
