@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="2">
+    <title>Nam Knobs __VERSION__</title>
+    <organization>com.vfxchris</organization>
+    <welcome    file="welcome.html"    mime-type="text/html"/>
+    <conclusion file="conclusion.html" mime-type="text/html"/>
+    <background          file="__BACKGROUND__" alignment="bottomleft" scaling="proportional"/>
+    <background-darkAqua file="__BACKGROUND__" alignment="bottomleft" scaling="proportional"/>
+
+    <options customize="allow" require-scripts="false" rootVolumeOnly="true" hostArchitectures="arm64,x86_64"/>
+    <domains enable_localSystem="true"/>
+    <volume-check>
+        <allowed-os-versions><os-version min="11.0"/></allowed-os-versions>
+    </volume-check>
+
+    <choices-outline>
+        <line choice="vst3"/>
+        <line choice="au"/>
+        <line choice="app"/>
+    </choices-outline>
+
+    <choice id="vst3" title="VST3 plug-in"
+            description="Nam Knobs.vst3 for Ableton Live, Cubase, Studio One, Reaper, Bitwig, LUNA and other VST3 hosts. Installed in /Library/Audio/Plug-Ins/VST3.">
+        <pkg-ref id="com.vfxchris.namknobs.vst3"/>
+    </choice>
+    <choice id="au" title="Audio Unit"
+            description="Nam Knobs.component for Logic Pro, GarageBand and MainStage. Installed in /Library/Audio/Plug-Ins/Components.">
+        <pkg-ref id="com.vfxchris.namknobs.au"/>
+    </choice>
+    <choice id="app" title="Standalone app"
+            description="Nam Knobs.app: play through your audio interface without a DAW. Installed in /Applications.">
+        <pkg-ref id="com.vfxchris.namknobs.app"/>
+    </choice>
+
+    <pkg-ref id="com.vfxchris.namknobs.vst3" version="__VERSION__" onConclusion="none">vst3.pkg</pkg-ref>
+    <pkg-ref id="com.vfxchris.namknobs.au"   version="__VERSION__" onConclusion="none">au.pkg</pkg-ref>
+    <pkg-ref id="com.vfxchris.namknobs.app"  version="__VERSION__" onConclusion="none">app.pkg</pkg-ref>
+</installer-gui-script>

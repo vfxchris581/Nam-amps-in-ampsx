@@ -1,0 +1,3 @@
+#!/bin/bash
+rm -rf "/Library/Audio/Plug-Ins/Components/Nam Knobs.component"
+exit 0

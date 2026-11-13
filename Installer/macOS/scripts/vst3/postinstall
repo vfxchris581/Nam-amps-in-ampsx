@@ -1,0 +1,4 @@
+#!/bin/bash
+# Make sure the freshly installed bundle is never treated as a quarantined download.
+xattr -dr com.apple.quarantine "/Library/Audio/Plug-Ins/VST3/Nam Knobs.vst3" 2>/dev/null
+exit 0

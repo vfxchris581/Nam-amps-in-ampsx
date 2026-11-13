@@ -44,7 +44,7 @@ Two independent slots (WAV/AIFF, mono or stereo, 44.1–192 kHz, any length): vo
 ## Build
 
 ```bash
-# macOS (universal), produces dist/NamKnobs-macOS.dmg
+# macOS (universal), produces dist/NamKnobs-macOS.dmg with the "Install Nam Knobs.pkg" installer
 BuildScripts/build_macos.sh
 # Windows (Visual Studio 2022)
 powershell -ExecutionPolicy Bypass -File BuildScripts\build_windows.ps1

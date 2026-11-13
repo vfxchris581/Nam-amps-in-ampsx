@@ -1,15 +1,23 @@
 # Installing Nam Knobs
 
 ## macOS
-1. Open `NamKnobs-macOS.dmg`.
-2. Drag **Nam Knobs.app** to **Applications** (standalone).
-3. Copy the plug-ins from the `Plug-Ins` folder:
-   - `Nam Knobs.vst3` → `~/Library/Audio/Plug-Ins/VST3/`
-   - `Nam Knobs.component` → `~/Library/Audio/Plug-Ins/Components/`
-4. Restart your DAW and rescan plug-ins.
+1. Open `NamKnobs-macOS.dmg` and double-click **Install Nam Knobs.pkg**.
+2. Click through the installer. By default it installs all three:
+   - **VST3** → `/Library/Audio/Plug-Ins/VST3/Nam Knobs.vst3`
+   - **Audio Unit** → `/Library/Audio/Plug-Ins/Components/Nam Knobs.component` (Logic, GarageBand, MainStage)
+   - **Standalone app** → `/Applications/Nam Knobs.app`
 
-CI builds are ad-hoc signed, not notarised. If macOS blocks the app the first time, right-click it → **Open**, or run
-`xattr -dr com.apple.quarantine "/Applications/Nam Knobs.app"` (and the same for the plug-in bundles).
+   Click **Customize** on the *Installation Type* page to leave any of them out.
+3. Open your DAW and rescan plug-ins if needed. Nam Knobs is listed under **VFX Chris**.
+
+Universal build: runs natively on Apple Silicon and Intel, macOS 11 or later.
+
+**If macOS says the installer "can't be opened"** (builds without a Developer ID signature):
+open **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to
+"Install Nam Knobs.pkg", then open it again. Or right-click the installer → **Open** → **Open**.
+
+**Uninstall:** run **Uninstall Nam Knobs.command** from the disk image. It removes the app and
+plug-ins and asks whether to keep your library (amps, blends, captures, presets).
 
 ## Windows
 1. Unzip `NamKnobs-Windows.zip`.
