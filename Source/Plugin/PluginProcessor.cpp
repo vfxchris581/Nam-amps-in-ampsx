@@ -22,6 +22,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout createLayout()
                     .withStringFromValueFunction ([unit = s.unit, mx = s.max] (float v, int) {
                         if (unit == "dB") return juce::String (v, 1) + " dB";
                         if (unit == "ms") return juce::String (v, 2) + " ms";
+                        if (unit == "Hz") return v >= 1000.0f ? juce::String (v / 1000.0f, v >= 10000.0f ? 1 : 2) + " kHz"
+                                                              : juce::String (juce::roundToInt (v)) + " Hz";
+                        if (unit == "Q") return juce::String (v, 2);
                         if (mx <= 1.0001) return juce::String (juce::roundToInt (v * 100.0f)) + "%";
                         return juce::String (v, 1);
                     });
@@ -83,6 +86,12 @@ void NamVXProcessor::init (const juce::File& root)
            raw (pid::ir1Pan), raw (pid::ir1Invert), raw (pid::ir1Delay), raw (pid::ir2On), raw (pid::ir2Level),
            raw (pid::ir2Pan), raw (pid::ir2Invert), raw (pid::ir2Delay), {} };
     rp.matrixAuto = raw (pid::matrixAuto);
+    rp.phaseMode = raw (pid::phaseMode);
+    rp.eqOn = raw (pid::eqOn); rp.eqPost = raw (pid::eqPost); rp.eqOut = raw (pid::eqOut);
+    for (int bd = 0; bd < 7; ++bd)
+        for (int k = 0; k < 5; ++k)
+            rp.eqBand[bd][k] = *pid::eqBand[bd][k] ? raw (pid::eqBand[bd][k]) : nullptr;
+    for (int i = 0; i < kBlendSlots; ++i) rp.slotInvert[i] = raw (pid::slotInvert[i]);
     for (int i = 0; i < kBlendSlots; ++i) rp.blendMix[i] = raw (pid::blendMix[i]);
     for (int b = 0; b < 5; ++b) for (int m = 0; m < kBlendSlots; ++m) rp.toneSource[b][m] = raw (pid::toneSource[b][m]);
     apvts.addParameterListener (pid::channel, this);
@@ -138,6 +147,20 @@ void NamVXProcessor::snapshotParameters (EngineParameters& p) const noexcept
     p.ir1 = { b (rp.ir1On), f (rp.ir1Level), f (rp.ir1Pan), f (rp.ir1Delay), b (rp.ir1Invert) };
     p.ir2 = { b (rp.ir2On), f (rp.ir2Level), f (rp.ir2Pan), f (rp.ir2Delay), b (rp.ir2Invert) };
     p.matrixAuto = b (rp.matrixAuto);
+    p.phaseMode = (int) rp.phaseMode->load();
+    p.eq.enabled = b (rp.eqOn);
+    p.eq.postCab = rp.eqPost->load() > 0.5f;
+    p.eq.outputDb = f (rp.eqOut);
+    for (int bd = 0; bd < 7; ++bd)
+    {
+        auto& band = p.eq.band[(size_t) bd];
+        band.on = b (rp.eqBand[bd][0]);
+        band.freq = f (rp.eqBand[bd][1]);
+        if (rp.eqBand[bd][2]) band.gainDb = f (rp.eqBand[bd][2]);
+        if (rp.eqBand[bd][3]) band.q = f (rp.eqBand[bd][3]);
+        if (rp.eqBand[bd][4]) band.slope = (int) rp.eqBand[bd][4]->load();
+    }
+    for (int i = 0; i < kBlendSlots; ++i) p.slotInvert[(size_t) i] = b (rp.slotInvert[i]);
     for (int i = 0; i < kBlendSlots; ++i) p.blendMix[(size_t) i] = f (rp.blendMix[i]);
     for (int b = 0; b < 5; ++b) for (int m = 0; m < kBlendSlots; ++m) p.toneSource[(size_t) b][(size_t) m] = f (rp.toneSource[b][m]);
 }

@@ -17,6 +17,8 @@
 #include "ProfileInterpolation/CaptureBlender.h"
 #include "AmplifierEngine/AmpRuntime.h"
 #include "AmplifierEngine/ToneMatch.h"
+#include "ProfileInterpolation/PhaseMatcher.h"
+#include "AudioEngine/ParametricEQ.h"
 #include "ChannelManager/ChannelManager.h"
 #include "PresetManager/AmpLibrary.h"
 #include "PresetManager/PresetManager.h"
@@ -828,6 +830,147 @@ TEST (blend_knobs_act_like_real_amp_knobs)
     const double t0 = thd (0), t10 = thd (10);
     INFO ("Auto blend gain knob: THD %.1f dB at 0 -> %.1f dB at 10", t0, t10);
     CHECK (t10 > t0 + 3.0);
+}
+
+TEST (phase_matcher_recovers_subsample_delay_and_polarity)
+{
+    const double fs = 48000;
+    const auto ref = PhaseMatcher::makeProbe (fs);
+    for (double d : { 0.0, 7.3, -12.6, 40.25 })
+        for (int pol : { 1, -1 })
+        {
+            // ideal fractional delay of the probe (windowed sinc)
+            std::vector<double> sig (ref.size(), 0.0);
+            for (size_t i = 0; i < sig.size(); ++i)
+            {
+                double acc = 0.0;
+                for (int k = -32; k <= 32; ++k)
+                {
+                    const double t = (double) i - d - std::floor ((double) i - d) ;
+                    const long j = (long) std::floor ((double) i - d) + k;
+                    if (j < 0 || j >= (long) ref.size()) continue;
+                    const double x = (double) k - t;
+                    const double sinc = std::abs (x) < 1e-9 ? 1.0 : std::sin (3.14159265358979 * x) / (3.14159265358979 * x);
+                    const double win = 0.5 + 0.5 * std::cos (3.14159265358979 * x / 33.0);
+                    acc += ref[(size_t) j] * sinc * win;
+                }
+                sig[i] = pol * acc;
+            }
+            const auto e = PhaseMatcher::estimate (ref, sig, 144);
+            CHECK_MSG (std::abs (e.lag - d) < 0.15 && e.polarity == pol && e.correlation > 0.9,
+                       "delay %.2f pol %d -> lag %.3f pol %d corr %.2f", d, pol, e.lag, e.polarity, e.correlation);
+        }
+}
+
+TEST (phase_matched_blend_cancels_less)
+{
+    // The same capture loaded twice with one copy inverted is the worst case: a 50/50 blend
+    // cancels completely unless the phase stage catches the inversion.
+    const auto dir = tempDir ("phase");
+    AmpLibrary lib (tempDir ("phase_lib"));
+    std::string err, id;
+    id = lib.setBlendSlot (id, 0, makeCapture (dir, "P0", "A", "A", "P0", "wavenet_a1_standard.nam"), "Phase", err);
+    id = lib.setBlendSlot (id, 1, makeCapture (dir, "P1", "B", "B", "P1", "wavenet_a1_standard.nam"), "", err);
+    std::vector<std::string> errors;
+    auto rt = AmpRuntime::build (*lib.find (id), 48000, 256, {}, errors);
+    CHECK (errors.empty());
+
+    std::array<double, kBlendSlots> even {}; even[0] = even[1] = 1.0;
+    std::array<bool, kBlendSlots> inv {}; inv[1] = true; // user flipped slot 2
+    auto level = [&] (PhaseMode m, bool flip) {
+        rt->setPhaseMode (m);
+        std::array<bool, kBlendSlots> none {};
+        auto x = tst::sine (200.0, 48000, 48000, 0.05);
+        std::vector<double> y (x.size());
+        for (size_t i = 0; i < x.size(); i += 256)
+        {
+            rt->setKnobs (0, { 5, 5, 5, 5, 5, 5, 5, 5 });
+            rt->setBlendLevels (0, even);
+            rt->setSlotPolarity (0, flip ? inv : none);
+            rt->process (0, x.data() + i, y.data() + i, (int) std::min<size_t> (256, x.size() - i));
+        }
+        return tst::tone (y, 24000, 16384, 200, 48000);
+    };
+    const double aligned = level (PhaseMode::PhaseMatched, false);
+    const double flippedOff = level (PhaseMode::Off, true);
+    INFO ("same capture twice: phase-matched %.5f, one copy inverted (phase off) %.6f", aligned, flippedOff);
+    CHECK (flippedOff < aligned * 0.05);            // inversion really cancels
+    const auto pi = rt->phaseInfo (0, 1);
+    INFO ("measured: lag %.3f samples, polarity %+d, correlation %.3f", pi.lag, pi.polarity, pi.correlation);
+    CHECK (std::abs (pi.lag) < 0.2 && pi.polarity == 1 && pi.correlation > 0.95);
+}
+
+TEST (phase_matching_helps_different_captures)
+{
+    // Two different networks blended 50/50: phase matching must not lose level vs. the raw sum,
+    // and it should recover what the raw sum cancels.
+    const auto dir = tempDir ("phase2");
+    AmpLibrary lib (tempDir ("phase2_lib"));
+    std::string err, id;
+    id = lib.setBlendSlot (id, 0, makeCapture (dir, "Q0", "A", "A", "Q0", "wavenet_a1_standard.nam"), "P2", err);
+    id = lib.setBlendSlot (id, 1, makeCapture (dir, "Q1", "B", "B", "Q1", "wavenet.nam"), "", err);
+    std::vector<std::string> errors;
+    auto rt = AmpRuntime::build (*lib.find (id), 48000, 256, {}, errors);
+    std::array<double, kBlendSlots> even {}; even[0] = even[1] = 1.0;
+    auto level = [&] (PhaseMode m, double f) {
+        rt->setPhaseMode (m);
+        auto x = tst::sine (f, 48000, 48000, 0.05);
+        std::vector<double> y (x.size());
+        for (size_t i = 0; i < x.size(); i += 256)
+        {
+            rt->setKnobs (0, { 5, 5, 5, 5, 5, 5, 5, 5 });
+            rt->setBlendLevels (0, even);
+            rt->process (0, x.data() + i, y.data() + i, (int) std::min<size_t> (256, x.size() - i));
+        }
+        return tst::tone (y, 24000, 16384, f, 48000);
+    };
+    const auto pi = rt->phaseInfo (0, 1);
+    INFO ("measured between the two captures: lag %+.2f samples, polarity %+d, correlation %.2f", pi.lag, pi.polarity, pi.correlation);
+    double sumOff = 0, sumMatched = 0;
+    for (double f : { 120.0, 330.0, 900.0, 2200.0 })
+    {
+        const double off = level (PhaseMode::Off, f), matched = level (PhaseMode::PhaseMatched, f);
+        INFO ("%6.0f Hz: phase off %.4f  phase-matched %.4f  (%+.1f dB)", f, off, matched, tst::db (matched / off));
+        sumOff += off; sumMatched += matched;
+    }
+    CHECK (sumMatched >= sumOff * 0.98);
+}
+
+TEST (studio_eq_response)
+{
+    const double fs = 48000;
+    EqSettings s;
+    for (auto& b : s.band) b.gainDb = 0.0;
+    // flat when every gain is 0 and the cuts are off
+    for (double f : { 30.0, 200.0, 1000.0, 5000.0, 15000.0 }) CHECK (std::abs (ParametricEQ::responseDb (s, fs, f)) < 0.01);
+
+    s.band[EqSettings::Bell2] = { true, 1000.0, 6.0, 1.0, 1 };
+    CHECK (std::abs (ParametricEQ::responseDb (s, fs, 1000.0) - 6.0) < 0.05);
+    s.band[EqSettings::LowCut] = { true, 100.0, 0.0, 0.707, 1 };   // 24 dB/oct Butterworth: -3 dB at fc
+    CHECK (std::abs (ParametricEQ::responseDb (s, fs, 100.0) + 3.01) < 0.1);
+    CHECK (ParametricEQ::responseDb (s, fs, 25.0) < -45.0);          // two octaves down: ~-48 dB
+    s.band[EqSettings::HighCut] = { true, 8000.0, 0.0, 0.707, 2 };  // 48 dB/oct
+    CHECK (std::abs (ParametricEQ::responseDb (s, fs, 8000.0) + 3.01) < 0.15);
+
+    // the real-time filter matches the analytic response
+    ParametricEQ eq;
+    eq.setSettings (s);
+    eq.prepare (fs);
+    for (double f : { 150.0, 1000.0, 6000.0 })
+    {
+        auto x = tst::sine (f, fs, 48000, 0.1);
+        eq.reset();
+        eq.process (x.data(), (int) x.size());
+        const double got = tst::db (tst::tone (x, 24000, 16384, f, fs) / 0.1);
+        CHECK_MSG (std::abs (got - ParametricEQ::responseDb (s, fs, f)) < 0.2, "%.0f Hz: %.2f vs %.2f", f, got, ParametricEQ::responseDb (s, fs, f));
+    }
+    // no NaN with extreme settings
+    EqSettings x2;
+    for (auto& b : x2.band) { b.on = true; b.gainDb = 18.0; b.q = 10.0; b.slope = 2; }
+    ParametricEQ e2; e2.setSettings (x2); e2.prepare (fs);
+    auto noise = tst::sine (997.0, fs, 4800, 0.9);
+    e2.process (noise.data(), (int) noise.size());
+    CHECK (tst::allFinite (noise));
 }
 
 static double bandLevel (const std::vector<double>& y, double fs, double f)

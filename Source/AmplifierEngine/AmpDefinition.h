@@ -46,7 +46,7 @@ struct AmpDefinition
     /** A blend mixes NAM models of *different* amps at user-set levels (Mix knobs) instead of
         interpolating captures of one amp by knob position. */
     bool isBlend = false;
-    static constexpr int kMaxBlendModels = 8;
+    static constexpr int kMaxBlendModels = 18;
 
     int totalCaptures() const;
     int findChannel (const std::string& name) const; // -1 if none (case/format-insensitive)

@@ -38,6 +38,7 @@ target_sources(NamVX PRIVATE
     ${PROJECT_SOURCE_DIR}/Source/GUI/TubePanel.cpp
     ${PROJECT_SOURCE_DIR}/Source/GUI/LibraryPanel.cpp
     ${PROJECT_SOURCE_DIR}/Source/GUI/ToneMatrixPanel.cpp
+    ${PROJECT_SOURCE_DIR}/Source/GUI/EqPanel.cpp
     ${PROJECT_SOURCE_DIR}/Source/GUI/PluginEditor.cpp
     ${NAMVX_CORE_ABS})
 
@@ -69,6 +70,7 @@ if(NAMVX_BUILD_SCREENSHOT)
         ${PROJECT_SOURCE_DIR}/Source/GUI/TubePanel.cpp
         ${PROJECT_SOURCE_DIR}/Source/GUI/LibraryPanel.cpp
         ${PROJECT_SOURCE_DIR}/Source/GUI/ToneMatrixPanel.cpp
+        ${PROJECT_SOURCE_DIR}/Source/GUI/EqPanel.cpp
         ${PROJECT_SOURCE_DIR}/Source/GUI/PluginEditor.cpp
         ${NAMVX_CORE_ABS})
     target_compile_definitions(NamVXScreenshot PRIVATE JucePlugin_Name="Nam VX" NAMVX_SCREENSHOT=1

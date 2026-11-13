@@ -20,6 +20,7 @@
 #include "TubeCircuitDSP/PowerAmpStage.h"
 #include "HarmonicEngine/HarmonicEngine.h"
 #include "Convolution/DualCabinet.h"
+#include "ParametricEQ.h"
 
 namespace namvx
 {
@@ -51,6 +52,9 @@ public:
     void process (double* const* io, int numInputChannels, int numOutputChannels, int n) noexcept;
 
     DualCabinet& getCabinet() noexcept { return cabinet; }
+
+    /** UI: pulls the most recent output samples (mono) for the spectrum analyser. Returns count. */
+    int readSpectrumSamples (float* dest, int maxSamples) noexcept;
     int getLatencySamples() const noexcept { return latency.load(); }
     double getSampleRate() const noexcept { return sampleRate; }
 
@@ -84,6 +88,7 @@ private:
     ToneResidual residual;
     ToneMatch toneMatch;
     DualCabinet cabinet;
+    ParametricEQ eq;
 
     Smoothed inGain, residualIn, residualOut, volumeGain, masterGain, outGain, tubeMix, tubeDrive, paDrive;
     double dipEnv = 1.0;
@@ -95,6 +100,8 @@ private:
     std::vector<float> monoF;
     std::atomic<int> latency { 0 };
     int runtimeLatency = 0;
+    juce::AbstractFifo spectrumFifo { 16384 };
+    std::vector<float> spectrumBuf = std::vector<float> (16384, 0.0f);
     std::array<double, kBlendSlots> effGain {};
     std::array<std::array<double, kBlendSlots>, 5> effBands {};
 };

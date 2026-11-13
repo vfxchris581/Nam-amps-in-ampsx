@@ -23,6 +23,7 @@ public:
 
 private:
     struct CellMouse;
+    struct MatrixCell;
     void timerCallback() override;
     void setRow (int row, int soloSlot);
     void showCellMenu (int row, int slot);
@@ -31,10 +32,13 @@ private:
 
     NamVXProcessor& proc;
     std::vector<std::unique_ptr<Knob>> ampKnobs;
-    juce::Slider cells[kRows][kSlots];
+    std::unique_ptr<MatrixCell> cells[kRows][kSlots];
     std::unique_ptr<APVTS::SliderAttachment> attach[kRows][kSlots];
     std::unique_ptr<CellMouse> mouse[kRows][kSlots];
     juce::TextButton load[kSlots], clear[kSlots];
+    std::unique_ptr<Toggle> invert[kSlots];
+    Choice phase;
+    juce::Label phaseLabel { {}, "Phase" };
     juce::Label names[kSlots], readout[kRows];
     Toggle autoToggle;
     juce::TextButton resetAll { "Even blend" };
@@ -44,6 +48,6 @@ private:
     int numLoaded = 0;
     bool autoMode = true, lastAuto = true;
     juce::Rectangle<int> slotsArea, plate, matrixArea, grid;
-    int labelW = 120, readW = 66;
+    int labelW = 104, readW = 58;
 };
 } // namespace namvx

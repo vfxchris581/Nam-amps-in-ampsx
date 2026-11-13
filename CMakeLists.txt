@@ -102,6 +102,8 @@ set(NAMVX_CORE_SOURCES
     Source/PresetManager/AmpLibrary.cpp
     Source/PresetManager/PresetManager.cpp
     Source/AudioEngine/EngineParameters.cpp
+    Source/AudioEngine/ParametricEQ.cpp
+    Source/ProfileInterpolation/PhaseMatcher.cpp
     Source/AudioEngine/SignalChain.cpp)
 
 set(NAMVX_COMMON_DEFS

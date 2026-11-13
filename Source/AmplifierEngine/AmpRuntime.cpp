@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include "ProfileAnalyzer/ProfileAnalyzer.h"
+#include "ProfileInterpolation/PhaseMatcher.h"
 
 namespace namvx
 {
@@ -73,10 +74,56 @@ std::unique_ptr<AmpRuntime> AmpRuntime::build (const AmpDefinition& def, double 
             if (cap->analysis && cap->analysis->valid)
             {
                 if (refPolarity == 0) refPolarity = cap->analysis->polarity;
-                if (cap->analysis->polarity != refPolarity) s.staticGain = -s.staticGain;
+                s.analysisPolarity = cap->analysis->polarity == refPolarity ? 1 : -1;
                 s.intrinsicLatency = (int) std::lround (cap->analysis->latencySamples * sr / cap->analysis->sampleRate);
             }
             sources.push_back (s);
+        }
+
+        // Phase matching: play one probe through every capture, time-align by latency, then measure
+        // each capture's residual (sub-sample) lag and polarity against the first capture.
+        if (sources.size() >= 2)
+        {
+            const auto probe = PhaseMatcher::makeProbe (sr);
+            const int maxLag = (int) std::ceil (0.003 * sr);
+            std::vector<std::vector<double>> resp (sources.size());
+            int maxTot = 0;
+            std::vector<int> tot (sources.size());
+            for (size_t i = 0; i < sources.size(); ++i)
+            {
+                tot[i] = sources[i].model->getResamplingLatency() + sources[i].intrinsicLatency;
+                maxTot = std::max (maxTot, tot[i]);
+            }
+            std::vector<double> buf ((size_t) maxBlock), zeros ((size_t) maxBlock, 0.0);
+            for (size_t i = 0; i < sources.size(); ++i)
+            {
+                auto* m = sources[i].model;
+                std::vector<double> y (probe.size() + (size_t) maxTot + (size_t) maxBlock, 0.0);
+                std::vector<double> x = probe;
+                x.resize (y.size(), 0.0);
+                for (size_t p = 0; p < x.size(); p += (size_t) maxBlock)
+                {
+                    const int n = (int) std::min ((size_t) maxBlock, x.size() - p);
+                    m->process (x.data() + p, y.data() + p, n);
+                }
+                // remove this capture's own latency (exactly what Time-aligned mode does)
+                std::vector<double> a (probe.size(), 0.0);
+                for (size_t k = 0; k < a.size(); ++k)
+                    if (k + (size_t) tot[i] < y.size()) a[k] = y[k + (size_t) tot[i]];
+                resp[i] = std::move (a);
+                // flush the probe out of the network's memory before real audio starts
+                for (int f = 0; f < (int) (0.4 * sr) / maxBlock + 1; ++f) m->process (zeros.data(), buf.data(), maxBlock);
+            }
+            for (size_t i = 1; i < sources.size(); ++i)
+            {
+                const auto e = PhaseMatcher::estimate (resp[0], resp[i], maxLag);
+                if (e.correlation >= PhaseMatcher::kMinCorrelation)
+                {
+                    sources[i].phaseLag = e.lag;
+                    sources[i].phasePolarity = e.polarity;
+                }
+                ch.phaseCorrelation.push_back (e.correlation);
+            }
         }
         ch.blender.prepare (sr, maxBlock, std::move (sources));
         ch.blender.setAlwaysOn (opts.alwaysOnModels);
@@ -228,6 +275,31 @@ AmpRuntime::AutoBlend AmpRuntime::autoBlend (int channel, const KnobCoords& k) c
         a.varies[(size_t) b + 1] = sweep (k[(size_t) bandKnob[b]], [&] (int m) { return ch.bands[(size_t) m][(size_t) b]; },
                                           a.bands[(size_t) b], 1.0);
     return a;
+}
+
+void AmpRuntime::setPhaseMode (PhaseMode m) noexcept
+{
+    for (auto& ch : channels) ch.blender.setPhaseMode (m);
+}
+
+void AmpRuntime::setSlotPolarity (int channel, const std::array<bool, AmpDefinition::kMaxBlendModels>& invert) noexcept
+{
+    if (channel < 0 || channel >= (int) channels.size()) return;
+    auto& ch = channels[(size_t) channel];
+    for (int i = 0; i < ch.blender.numSources() && i < (int) ch.slot.size(); ++i)
+        ch.blender.setUserPolarity (i, invert[(size_t) ch.slot[(size_t) i]] ? -1 : 1);
+}
+
+AmpRuntime::PhaseInfo AmpRuntime::phaseInfo (int channel, int source) const noexcept
+{
+    PhaseInfo p;
+    if (channel < 0 || channel >= (int) channels.size()) return p;
+    const auto& ch = channels[(size_t) channel];
+    if (source <= 0 || source >= ch.blender.numSources()) return p;
+    p.lag = ch.blender.source (source).phaseLag;
+    p.polarity = ch.blender.source (source).phasePolarity;
+    p.correlation = (size_t) source - 1 < ch.phaseCorrelation.size() ? ch.phaseCorrelation[(size_t) source - 1] : 0.0;
+    return p;
 }
 
 bool AmpRuntime::isCovered (int channel, Control c) const noexcept

@@ -21,7 +21,7 @@ namespace namvx
 {
 struct InterpolationResult
 {
-    static constexpr int kMaxActive = 8; // also the blend slot count
+    static constexpr int kMaxActive = 18; // also the blend slot count
     int numActive = 0;
     std::array<int, kMaxActive> index {};
     std::array<double, kMaxActive> weight {};

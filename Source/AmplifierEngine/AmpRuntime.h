@@ -58,6 +58,14 @@ public:
     std::array<double, 5> toneCorrection (int channel, const std::array<double, AmpDefinition::kMaxBlendModels>& gainLevels,
                                           const std::array<std::array<double, AmpDefinition::kMaxBlendModels>, 5>& bandLevels) const noexcept;
 
+    /** Audio thread: phase handling for every channel (Off / Time-aligned / Phase-matched). */
+    void setPhaseMode (PhaseMode m) noexcept;
+    /** Audio thread, blends: user polarity per slot (true = inverted). */
+    void setSlotPolarity (int channel, const std::array<bool, AmpDefinition::kMaxBlendModels>& invert) noexcept;
+    /** Measured phase relationship (for display/tests): lag in samples, polarity, correlation. */
+    struct PhaseInfo { double lag = 0; int polarity = 1; double correlation = 1; };
+    PhaseInfo phaseInfo (int channel, int source) const noexcept;
+
     bool isCovered (int channel, Control c) const noexcept;
     int numRunningModels (int channel) const noexcept;
 
@@ -72,6 +80,7 @@ private:
         std::vector<std::array<double, 5>> bands; // analysed tonal balance per source (dB)
         std::vector<int> slot;                    // blends: Tone Matrix column of each source
         std::vector<double> gainFeature;          // distortion measure per source (analysis)
+        std::vector<double> phaseCorrelation;     // probe correlation of each source vs source 0
     };
     std::vector<Channel> channels;
     std::string ampId;

@@ -4,7 +4,7 @@ namespace namvx
 {
 NamVXEditor::NamVXEditor (NamVXProcessor& p)
     : AudioProcessorEditor (p), proc (p),
-      ampPanel (p), capturesPanel (p), cabinetPanel (p), tubePanel (p), libraryPanel (p), toneMatrixPanel (p)
+      ampPanel (p), capturesPanel (p), cabinetPanel (p), tubePanel (p), libraryPanel (p), toneMatrixPanel (p), eqPanel (p)
 {
     setLookAndFeel (&lnf);
     addAndMakeVisible (content);
@@ -17,6 +17,7 @@ NamVXEditor::NamVXEditor (NamVXProcessor& p)
     tabs.setColour (juce::TabbedComponent::backgroundColourId, ui::bg);
     tabs.addTab ("Amp", ui::bg, &ampPanel, false);
     tabs.addTab ("Tone Matrix", ui::bg, &toneMatrixPanel, false);
+    tabs.addTab ("EQ", ui::bg, &eqPanel, false);
     tabs.addTab ("Captures", ui::bg, &capturesPanel, false);
     tabs.addTab ("Cabinet", ui::bg, &cabinetPanel, false);
     tabs.addTab ("Tube & Harmonics", ui::bg, &tubePanel, false);

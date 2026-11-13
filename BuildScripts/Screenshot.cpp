@@ -84,10 +84,16 @@ public:
             writeDemoCapture (bl, "Recto Modern Lead", "Recto Modern Lead");
             writeDemoCapture (bl, "Deluxe Clean Edge", "Deluxe Clean Edge", "lstm.nam");
             std::string err;
-            blendId = lib.createBlend ("Plexi x Recto x Deluxe",
-                                       { bl.getChildFile ("Plexi 1959 Crunch.nam").getFullPathName().toStdString(),
-                                         bl.getChildFile ("Recto Modern Lead.nam").getFullPathName().toStdString(),
-                                         bl.getChildFile ("Deluxe Clean Edge.nam").getFullPathName().toStdString() }, err);
+            const char* extra[][2] = { { "JCM800 Lead", "wavenet_a1_standard.nam" }, { "AC30 Top Boost", "lstm.nam" },
+                                       { "5150 Red", "wavenet.nam" }, { "Twin Reverb Clean", "lstm.nam" },
+                                       { "Bogner Uber", "wavenet_a1_standard.nam" }, { "Dumble ODS", "wavenet.nam" },
+                                       { "SLO Crunch", "wavenet_a1_standard.nam" } };
+            for (auto& e : extra) writeDemoCapture (bl, e[0], e[0], e[1]);
+            std::vector<std::filesystem::path> files { bl.getChildFile ("Plexi 1959 Crunch.nam").getFullPathName().toStdString(),
+                                                       bl.getChildFile ("Recto Modern Lead.nam").getFullPathName().toStdString(),
+                                                       bl.getChildFile ("Deluxe Clean Edge.nam").getFullPathName().toStdString() };
+            for (auto& e : extra) files.push_back (bl.getChildFile (juce::String (e[0]) + ".nam").getFullPathName().toStdString());
+            blendId = lib.createBlend ("Ten Amp Stack", files, err);
         }
         processor = std::make_unique<NamVXProcessor> (root);
         for (auto& a : processor->getLibrary().getAmps())
@@ -122,7 +128,7 @@ public:
                 processor->loadAmp (blendId);
                 if (auto* prm = processor->getAPVTS().getParameter (pid::matrixAuto)) prm->setValueNotifyingHost (0.0f);
                 // gain mostly from model 1, bass only from model 2, mids blended 2+3, treble/presence from 3
-                const float gain[] = { 1.0f, 0.25f, 0.0f, 0.0f, 0, 0, 0, 0 };
+                const float gain[kBlendSlots] = { 1.0f, 0.25f, 0.0f, 0.0f };
                 const float tone[5][kBlendSlots] = { { 0, 1, 0, 0 }, { 0, 1, 0, 0 }, { 0, 0.6f, 0.4f, 0 }, { 0, 0, 1, 0 }, { 0.3f, 0, 1, 0 } };
                 auto setP = [this] (const char* id, float v) {
                     if (auto* prm = processor->getAPVTS().getParameter (id)) prm->setValueNotifyingHost (v); };
@@ -191,8 +197,19 @@ public:
 
     void snapshot()
     {
-        const char* names[] = { "amp", "tone-matrix-empty", "captures", "cabinet", "tube-harmonics", "library" };
-        for (int t = 0; t < 6; ++t)
+        // a musical EQ setting for the EQ page shot
+        auto setE = [this] (const char* id, float v) {
+            if (auto* prm = processor->getAPVTS().getParameter (id)) prm->setValueNotifyingHost (prm->convertTo0to1 (v)); };
+        setE (pid::eqBand[0][0], 1.0f); setE (pid::eqBand[0][1], 85.0f);
+        setE (pid::eqBand[1][2], 2.0f);
+        setE (pid::eqBand[2][1], 350.0f); setE (pid::eqBand[2][2], -2.5f);
+        setE (pid::eqBand[3][1], 1800.0f); setE (pid::eqBand[3][2], 3.5f);
+        setE (pid::eqBand[4][1], 3600.0f); setE (pid::eqBand[4][2], -4.0f); setE (pid::eqBand[4][3], 2.5f);
+        setE (pid::eqBand[5][2], 1.5f);
+        setE (pid::eqBand[6][0], 1.0f); setE (pid::eqBand[6][1], 9500.0f);
+        playAudio();
+        const char* names[] = { "amp", "tone-matrix-empty", "eq", "captures", "cabinet", "tube-harmonics", "library" };
+        for (int t = 0; t < 7; ++t)
         {
             editor->showTab (t);
             editor->setSize (NamVXEditor::kWidth, NamVXEditor::kHeight);

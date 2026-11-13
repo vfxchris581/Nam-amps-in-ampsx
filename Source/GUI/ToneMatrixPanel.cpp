@@ -7,6 +7,31 @@ namespace
 const char* rowNames[] = { "Gain", "Resonance", "Bass", "Middle", "Treble", "Presence" };
 } // namespace
 
+/** Compact draggable matrix cell: a filled bar with a small percentage. */
+struct ToneMatrixPanel::MatrixCell : juce::Slider
+{
+    MatrixCell()
+    {
+        setSliderStyle (juce::Slider::LinearHorizontal);
+        setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
+        setRange (0.0, 1.0);
+        setDoubleClickReturnValue (true, 1.0);
+        setSliderSnapsToMousePosition (false);
+    }
+    void paint (juce::Graphics& g) override
+    {
+        auto r = getLocalBounds().toFloat().reduced (1.0f);
+        g.setColour (ui::panelHi);
+        g.fillRoundedRectangle (r, 3.0f);
+        const float v = (float) getValue();
+        g.setColour (ui::amber.withAlpha (isEnabled() ? 0.85f : 0.55f));
+        g.fillRoundedRectangle (r.withWidth (r.getWidth() * v), 3.0f);
+        g.setColour (v > 0.55f ? ui::ink : ui::text.withAlpha (0.85f));
+        g.setFont (ui::semi (10.0f));
+        g.drawText (juce::String (juce::roundToInt (v * 100)), r, juce::Justification::centred);
+    }
+};
+
 struct ToneMatrixPanel::CellMouse : juce::MouseListener
 {
     CellMouse (ToneMatrixPanel& o, int r, int s) : owner (o), row (r), slot (s) {}
@@ -21,7 +46,7 @@ juce::String ToneMatrixPanel::paramId (int row, int slot) const
 }
 
 ToneMatrixPanel::ToneMatrixPanel (NamVXProcessor& p)
-    : proc (p), autoToggle (p.getAPVTS(), pid::matrixAuto, "Auto (knobs blend the captures)")
+    : proc (p), phase (p.getAPVTS(), pid::phaseMode), autoToggle (p.getAPVTS(), pid::matrixAuto, "Auto (knobs blend the captures)")
 {
     for (int k = 0; k < kNumControls; ++k)
     {
@@ -32,14 +57,9 @@ ToneMatrixPanel::ToneMatrixPanel (NamVXProcessor& p)
     {
         for (int s = 0; s < kSlots; ++s)
         {
-            auto& c = cells[r][s];
-            c.setSliderStyle (juce::Slider::LinearBar);
-            c.setColour (juce::Slider::trackColourId, ui::amber.withAlpha (0.75f));
-            c.setColour (juce::Slider::backgroundColourId, ui::panelHi);
-            c.setColour (juce::Slider::textBoxTextColourId, ui::text);
-            c.setColour (juce::Slider::textBoxOutlineColourId, ui::line);
-            c.textFromValueFunction = [] (double v) { return juce::String (juce::roundToInt (v * 100)) + "%"; };
-            c.setDoubleClickReturnValue (true, 1.0);
+            cells[r][s] = std::make_unique<MatrixCell>();
+            auto& c = *cells[r][s];
+            c.setTooltip ("Drag to set; right-click for 'only this slot'");
             attach[r][s] = std::make_unique<APVTS::SliderAttachment> (p.getAPVTS(), paramId (r, s), c);
             mouse[r][s] = std::make_unique<CellMouse> (*this, r, s);
             c.addMouseListener (mouse[r][s].get(), true);
@@ -51,7 +71,7 @@ ToneMatrixPanel::ToneMatrixPanel (NamVXProcessor& p)
     }
     for (int s = 0; s < kSlots; ++s)
     {
-        names[s].setFont (ui::semi (11.0f));
+        names[s].setFont (ui::semi (10.5f));
         names[s].setJustificationType (juce::Justification::centred);
         names[s].setMinimumHorizontalScale (0.7f);
         addAndMakeVisible (names[s]);
@@ -67,8 +87,19 @@ ToneMatrixPanel::ToneMatrixPanel (NamVXProcessor& p)
         clear[s].setTooltip ("Empty this slot");
         clear[s].onClick = [this, s] { proc.clearBlendSlot (s); };
         addAndMakeVisible (clear[s]);
+        invert[s] = std::make_unique<Toggle> (p.getAPVTS(), pid::slotInvert[s], juce::String::fromUTF8 ("\xc3\x98"));
+        invert[s]->getProperties().set ("ledRed", true);
+        invert[s]->setTooltip ("Flip this capture's polarity");
+        addAndMakeVisible (*invert[s]);
     }
     addAndMakeVisible (autoToggle);
+    addAndMakeVisible (phase);
+    phase.setTooltip ("How blended captures are lined up. Phase-matched measures every capture against the others "
+                      "and fixes timing (to a fraction of a sample) and polarity, so blends don't cancel.");
+    phaseLabel.setFont (ui::semi (12.0f));
+    phaseLabel.setColour (juce::Label::textColourId, ui::textDim);
+    phaseLabel.setJustificationType (juce::Justification::centredRight);
+    addAndMakeVisible (phaseLabel);
     resetAll.onClick = [this] { for (int r = 0; r < kRows; ++r) setRow (r, -1); };
     addAndMakeVisible (resetAll);
     refresh();
@@ -78,7 +109,7 @@ ToneMatrixPanel::ToneMatrixPanel (NamVXProcessor& p)
 ToneMatrixPanel::~ToneMatrixPanel()
 {
     for (int r = 0; r < kRows; ++r)
-        for (int s = 0; s < kSlots; ++s) cells[r][s].removeMouseListener (mouse[r][s].get());
+        for (int s = 0; s < kSlots; ++s) cells[r][s]->removeMouseListener (mouse[r][s].get());
 }
 
 void ToneMatrixPanel::setRow (int row, int soloSlot)
@@ -127,11 +158,12 @@ void ToneMatrixPanel::refresh()
             }
         }
         if (loaded[s]) ++numLoaded;
-        names[s].setText (loaded[s] ? n : juce::String ("Slot ") + juce::String (s + 1), juce::dontSendNotification);
+        names[s].setText (juce::String (s + 1) + ". " + (loaded[s] ? n : juce::String ("empty")), juce::dontSendNotification);
         names[s].setColour (juce::Label::textColourId, loaded[s] ? ui::text : ui::textDim);
-        load[s].setButtonText (loaded[s] ? "Replace" : "Load NAM");
+        load[s].setButtonText (loaded[s] ? "Replace" : "Load");
         clear[s].setVisible (loaded[s]);
-        for (int r = 0; r < kRows; ++r) cells[r][s].setAlpha (loaded[s] ? 1.0f : 0.2f);
+        invert[s]->setVisible (loaded[s]);
+        for (int r = 0; r < kRows; ++r) cells[r][s]->setAlpha (loaded[s] ? 1.0f : 0.2f);
     }
     applyAutoState();
     resized();
@@ -142,12 +174,12 @@ void ToneMatrixPanel::applyAutoState()
 {
     autoMode = proc.getAPVTS().getRawParameterValue (pid::matrixAuto)->load() > 0.5f;
     for (int r = 0; r < kRows; ++r)
-        for (int s = 0; s < kSlots; ++s) cells[r][s].setEnabled (! autoMode && loaded[s]);
+        for (int s = 0; s < kSlots; ++s) cells[r][s]->setEnabled (! autoMode && loaded[s]);
     resetAll.setEnabled (! autoMode);
     if (! autoMode && lastAuto) // back to manual: show each cell's own parameter again
         for (int r = 0; r < kRows; ++r)
             for (int s = 0; s < kSlots; ++s)
-                attach[r][s] = std::make_unique<APVTS::SliderAttachment> (proc.getAPVTS(), paramId (r, s), cells[r][s]);
+                attach[r][s] = std::make_unique<APVTS::SliderAttachment> (proc.getAPVTS(), paramId (r, s), *cells[r][s]);
     lastAuto = autoMode;
 }
 
@@ -162,7 +194,7 @@ void ToneMatrixPanel::timerCallback()
     if (autoMode && numLoaded > 0)
         for (int r = 0; r < kRows; ++r)
             for (int s = 0; s < kSlots; ++s)
-                if (loaded[s]) cells[r][s].setValue (ch.matrixWeights[(size_t) r][(size_t) s].load(), juce::dontSendNotification);
+                if (loaded[s]) { cells[r][s]->setValue (ch.matrixWeights[(size_t) r][(size_t) s].load(), juce::dontSendNotification); cells[r][s]->repaint(); }
     for (int r = 1; r < kRows; ++r)
     {
         const float db = numLoaded > 0 ? ch.toneCorrectionDb[(size_t) (r - 1)].load() : 0.0f;
@@ -177,7 +209,7 @@ void ToneMatrixPanel::paint (juce::Graphics& g)
     ui::drawTolex (g, getLocalBounds().toFloat());
 
     // loader rack
-    ui::drawPanel (g, slotsArea.toFloat(), "NAM loaders");
+    ui::drawPanel (g, slotsArea.toFloat(), "NAM loaders  -  " + juce::String (numLoaded) + " of " + juce::String (kSlots));
     // amp faceplate
     ui::drawFaceplate (g, plate.toFloat());
     g.setColour (ui::ink.withAlpha (0.65f));
@@ -201,24 +233,31 @@ void ToneMatrixPanel::paint (juce::Graphics& g)
 void ToneMatrixPanel::resized()
 {
     auto r = getLocalBounds().reduced (24, 12);
-    slotsArea = r.removeFromTop (92);
+    slotsArea = r.removeFromTop (128);
     r.removeFromTop (12);
-    plate = r.removeFromTop (230);
+    plate = r.removeFromTop (196);
     r.removeFromTop (12);
     matrixArea = r;
 
-    // loaders
+    // loaders: two rows of nine
     {
-        auto a = slotsArea.reduced (14, 10);
-        a.removeFromTop (22);
-        const int w = a.getWidth() / kSlots;
+        auto a = slotsArea.reduced (14, 8);
+        auto head = a.removeFromTop (22);
+        phase.setBounds (head.removeFromRight (150).reduced (0, 0));
+        phaseLabel.setBounds (head.removeFromRight (60));
+        a.removeFromTop (2);
+        const int perRow = (kSlots + 1) / 2;
+        const int w = a.getWidth() / perRow, h = a.getHeight() / 2;
         for (int s = 0; s < kSlots; ++s)
         {
-            auto col = juce::Rectangle<int> (a.getX() + s * w, a.getY(), w, a.getHeight()).reduced (4, 0);
-            names[s].setBounds (col.removeFromTop (26));
-            auto b = col.removeFromTop (26);
-            clear[s].setBounds (b.removeFromRight (26));
-            b.removeFromRight (3);
+            const int row = s / perRow, colIdx = s % perRow;
+            auto col = juce::Rectangle<int> (a.getX() + colIdx * w, a.getY() + row * h, w, h).reduced (3, 2);
+            names[s].setBounds (col.removeFromTop (18));
+            auto b = col.removeFromTop (24);
+            clear[s].setBounds (b.removeFromRight (22));
+            b.removeFromRight (2);
+            invert[s]->setBounds (b.removeFromRight (34));
+            b.removeFromRight (2);
             load[s].setBounds (b);
         }
     }
@@ -242,7 +281,7 @@ void ToneMatrixPanel::resized()
         for (int row = 0; row < kRows; ++row)
         {
             for (int s = 0; s < kSlots; ++s)
-                cells[row][s].setBounds (juce::Rectangle<int> (grid.getX() + labelW + s * colW, grid.getY() + row * rowH, colW, rowH)
+                cells[row][s]->setBounds (juce::Rectangle<int> (grid.getX() + labelW + s * colW, grid.getY() + row * rowH, colW, rowH)
                                              .reduced (4, 3));
             readout[row].setBounds (grid.getRight() - readW, grid.getY() + row * rowH, readW, rowH);
         }

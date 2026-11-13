@@ -5,6 +5,7 @@
 #include "TubePanel.h"
 #include "LibraryPanel.h"
 #include "ToneMatrixPanel.h"
+#include "EqPanel.h"
 
 namespace namvx
 {
@@ -25,7 +26,7 @@ public:
     void fileDragExit (const juce::StringArray&) override { dragging = false; repaint(); }
     void filesDropped (const juce::StringArray& files, int, int) override;
 
-    enum Tab { tabAmp = 0, tabToneMatrix, tabCaptures, tabCabinet, tabTube, tabLibrary };
+    enum Tab { tabAmp = 0, tabToneMatrix, tabEq, tabCaptures, tabCabinet, tabTube, tabLibrary };
     void showTab (int index) { tabs.setCurrentTabIndex (index); }
     static constexpr int kWidth = 1180, kHeight = 740;
 
@@ -45,6 +46,7 @@ private:
     TubePanel tubePanel;
     LibraryPanel libraryPanel;
     ToneMatrixPanel toneMatrixPanel;
+    EqPanel eqPanel;
     bool dragging = false;
 };
 } // namespace namvx

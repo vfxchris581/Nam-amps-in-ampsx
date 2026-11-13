@@ -72,6 +72,7 @@ void AmpPanel::refresh()
         }
         numMix = i;
     }
+    if (numMix > 6) numMix = 0; // many loaders: the Tone Matrix page is the place for them
     for (int i = 0; i < (int) mixKnobs.size(); ++i) mixKnobs[(size_t) i]->setVisible (i < numMix);
 
     // Badge each control: NAM = realised by blending captures, DSP = realised by circuit/EQ.

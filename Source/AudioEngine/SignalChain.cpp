@@ -2,6 +2,8 @@
 
 namespace namvx
 {
+static_assert (kBlendSlots == AmpDefinition::kMaxBlendModels, "slot counts must match");
+
 SignalChain::SignalChain() = default;
 SignalChain::~SignalChain() = default;
 
@@ -23,6 +25,7 @@ void SignalChain::prepare (double sr, int block)
 
     residual.prepare (sr, maxBlock);
     toneMatch.prepare (sr);
+    eq.prepare (sr);
     cabinet.prepare ({ sr, (juce::uint32) maxBlock, 2 });
     ampFadeLen = (int) (0.06 * sr);
     chanFadeLen = (int) (0.035 * sr);
@@ -158,6 +161,7 @@ void SignalChain::processMono (double* x, int n) noexcept
     ResidualAmounts res;
     if (rt != nullptr)
     {
+        rt->setPhaseMode ((PhaseMode) p.phaseMode);
         res = rt->setKnobs (channel, p.knobs);
         if (chanFade > 0 && prevChannel >= 0) rt->setKnobs (prevChannel, p.knobs);
         if (rt->isBlend())
@@ -184,6 +188,7 @@ void SignalChain::processMono (double* x, int n) noexcept
                 res.gain = (kn[(size_t) Control::Gain] - 5.0) * (ab.varies[0] ? 0.55 : 1.0);
             }
             rt->setBlendLevels (channel, effGain);
+            rt->setSlotPolarity (channel, p.slotInvert);
             for (int m = 0; m < kBlendSlots; ++m)
             {
                 matrixWeights[0][(size_t) m] = (float) effGain[(size_t) m];
@@ -284,6 +289,10 @@ void SignalChain::processMono (double* x, int n) noexcept
         for (int i = 0; i < n; ++i) x[i] *= masterGain.next();
     }
 
+    // ---- studio EQ (before the cabinet) -------------------------------------------------------
+    eq.setSettings (p.eq);
+    if (! p.eq.postCab) eq.process (x, n);
+
     // ---- cabinet -----------------------------------------------------------------------------
     DualCabinet::Global g;
     g.enabled = p.cabOn; g.stereo = p.cabStereo; g.autoAlign = p.cabAutoAlign;
@@ -296,6 +305,9 @@ void SignalChain::processMono (double* x, int n) noexcept
     cabinet.setSlotParams (1, toSlot (p.ir2));
     for (int i = 0; i < n; ++i) monoF[(size_t) i] = (float) x[i];
     cabinet.process (monoF.data(), stereo, n);
+
+    // ---- studio EQ (after the cabinet) --------------------------------------------------------
+    if (p.eq.postCab) eq.process (stereo.getWritePointer (0), stereo.getWritePointer (1), n);
 
     // ---- output gain + preset dip ------------------------------------------------------------
     if (dipRequested.exchange (false)) { dipPhase = 1; dipCounter = 0; }
@@ -314,5 +326,22 @@ void SignalChain::processMono (double* x, int n) noexcept
         opk = std::max (opk, std::max (std::abs (l), std::abs (r)));
     }
     outputPeak = std::max (opk, outputPeak.load() * 0.9f);
+
+    // feed the EQ page's spectrum analyser (drops samples if the UI isn't reading)
+    int s1, n1, s2, n2;
+    spectrumFifo.prepareToWrite (n, s1, n1, s2, n2);
+    for (int i = 0; i < n1; ++i) spectrumBuf[(size_t) (s1 + i)] = 0.5f * (stereo.getSample (0, i) + stereo.getSample (1, i));
+    for (int i = 0; i < n2; ++i) spectrumBuf[(size_t) (s2 + i)] = 0.5f * (stereo.getSample (0, n1 + i) + stereo.getSample (1, n1 + i));
+    spectrumFifo.finishedWrite (n1 + n2);
+}
+
+int SignalChain::readSpectrumSamples (float* dest, int maxSamples) noexcept
+{
+    int s1, n1, s2, n2;
+    spectrumFifo.prepareToRead (std::min (maxSamples, spectrumFifo.getNumReady()), s1, n1, s2, n2);
+    std::copy (spectrumBuf.begin() + s1, spectrumBuf.begin() + s1 + n1, dest);
+    std::copy (spectrumBuf.begin() + s2, spectrumBuf.begin() + s2 + n2, dest + n1);
+    spectrumFifo.finishedRead (n1 + n2);
+    return n1 + n2;
 }
 } // namespace namvx

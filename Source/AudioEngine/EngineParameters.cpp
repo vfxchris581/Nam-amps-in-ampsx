@@ -55,7 +55,26 @@ const std::vector<ParamSpec>& parameterSpecs()
         f (pid::ir2Pan, "IR 2 Pan", -1.0, 1.0, 0.0);
         b (pid::ir2Invert, "IR 2 Polarity", false);
         f (pid::ir2Delay, "IR 2 Delay", 0.0, 10.0, 0.0, "ms");
+        b (pid::eqOn, "EQ", true);
+        c (pid::eqPost, "EQ Position", { "Before cab", "After cab" }, 1);
+        f (pid::eqOut, "EQ Output", -18.0, 18.0, 0.0, "dB");
+        {
+            const EqSettings defaults;
+            for (int bd = 0; bd < 7; ++bd)
+            {
+                const auto& d = defaults.band[(size_t) bd];
+                const std::string nm = pid::eqBandName[bd];
+                b (pid::eqBand[bd][0], nm + " On", d.on);
+                s.push_back ({ pid::eqBand[bd][1], nm + " Freq", ParamKind::Float, 20.0, 20000.0, d.freq, 0.0, 1000.0, {}, "Hz" });
+                if (*pid::eqBand[bd][2]) f (pid::eqBand[bd][2], nm + " Gain", -18.0, 18.0, 0.0, "dB");
+                if (*pid::eqBand[bd][3]) s.push_back ({ pid::eqBand[bd][3], nm + " Q", ParamKind::Float, 0.1, 10.0, d.q, 0.0, 1.0, {}, "Q" });
+                if (*pid::eqBand[bd][4]) c (pid::eqBand[bd][4], nm + " Slope", { "12 dB/oct", "24 dB/oct", "48 dB/oct" }, d.slope);
+            }
+        }
         b (pid::matrixAuto, "Tone Matrix Auto", true);
+        c (pid::phaseMode, "Blend Phase", { "Off", "Time-aligned", "Phase-matched" }, 2);
+        for (int i = 0; i < kBlendSlots; ++i)
+            b (pid::slotInvert[i], "Slot " + std::to_string (i + 1) + " Polarity", false);
         for (int i = 0; i < kBlendSlots; ++i)
             f (pid::blendMix[i], "Gain Source " + std::to_string (i + 1), 0.0, 1.0, 1.0);
         for (int b = 0; b < 5; ++b)
