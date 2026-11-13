@@ -9,7 +9,7 @@
 #include "ToneResidual.h"
 #include "ProfileInterpolation/CaptureBlender.h"
 
-namespace namvx
+namespace namknobs
 {
 struct RuntimeOptions
 {
@@ -87,4 +87,4 @@ private:
     int latency = 0;
     bool blend = false;
 };
-} // namespace namvx
+} // namespace namknobs

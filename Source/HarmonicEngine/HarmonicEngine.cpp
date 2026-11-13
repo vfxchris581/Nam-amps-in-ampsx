@@ -1,6 +1,6 @@
 #include "HarmonicEngine.h"
 
-namespace namvx
+namespace namknobs
 {
 // Harmonics are generated with envelope-normalised Chebyshev polynomials: for a sinusoid of
 // amplitude A, A·T_k(x/A) is a pure k-th harmonic, so the engine *adds* harmonic detail
@@ -82,4 +82,4 @@ double HarmonicEngine::process (double x) noexcept
     const double y = x + (1.0 - set.attackPreserve * transient) * harm;
     return dc.process (y);
 }
-} // namespace namvx
+} // namespace namknobs

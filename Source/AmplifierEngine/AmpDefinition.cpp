@@ -5,7 +5,7 @@
 #include <sstream>
 #include <iomanip>
 
-namespace namvx
+namespace namknobs
 {
 int AmpDefinition::totalCaptures() const
 {
@@ -60,7 +60,7 @@ template <typename T> T get (const nlohmann::json& j, const char* key, T def)
 nlohmann::json toJson (const AmpDefinition& a)
 {
     nlohmann::json j;
-    j["format"] = "namvx-amp";
+    j["format"] = "namknobs-amp";
     j["version"] = 1;
     j["id"] = a.id;
     j["name"] = a.name;
@@ -180,4 +180,4 @@ AmpDefinition ampFromJson (const nlohmann::json& j)
         }
     return a;
 }
-} // namespace namvx
+} // namespace namknobs

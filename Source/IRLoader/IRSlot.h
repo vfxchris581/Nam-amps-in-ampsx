@@ -6,7 +6,7 @@
 #include <juce_dsp/juce_dsp.h>
 #include <juce_audio_formats/juce_audio_formats.h>
 
-namespace namvx
+namespace namknobs
 {
 struct IRInfo
 {
@@ -63,4 +63,4 @@ private:
     std::atomic<bool> loadedFlag { false };
     std::atomic<bool> stereoIR { false };
 };
-} // namespace namvx
+} // namespace namknobs

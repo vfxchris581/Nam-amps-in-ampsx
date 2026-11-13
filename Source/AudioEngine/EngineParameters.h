@@ -9,7 +9,7 @@
 #include "HarmonicEngine/HarmonicEngine.h"
 #include "ParametricEQ.h"
 
-namespace namvx
+namespace namknobs
 {
 /** Number of NAM loader slots in a blend (Tone Matrix columns). */
 constexpr int kBlendSlots = 18;
@@ -129,4 +129,4 @@ namespace pid
     inline const char* slotInvert[kBlendSlots] = { "slotInv1", "slotInv2", "slotInv3", "slotInv4", "slotInv5", "slotInv6", "slotInv7", "slotInv8", "slotInv9", "slotInv10", "slotInv11", "slotInv12", "slotInv13", "slotInv14", "slotInv15", "slotInv16", "slotInv17", "slotInv18" };
     inline const char* toneBandName[5] = { "Resonance", "Bass", "Middle", "Treble", "Presence" };
 } // namespace pid
-} // namespace namvx
+} // namespace namknobs

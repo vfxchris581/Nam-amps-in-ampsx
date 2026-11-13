@@ -2,13 +2,13 @@
 #include "Widgets.h"
 #include "Plugin/PluginProcessor.h"
 
-namespace namvx
+namespace namknobs
 {
 /** Amp library (load / rename / delete amps, manage channels) and the preset browser. */
 class LibraryPanel : public juce::Component
 {
 public:
-    explicit LibraryPanel (NamVXProcessor& p);
+    explicit LibraryPanel (NamKnobsProcessor& p);
     void refresh();
     void paint (juce::Graphics&) override;
     void resized() override;
@@ -32,7 +32,7 @@ private:
     void askText (const juce::String& title, const juce::String& initial, std::function<void (juce::String)> done);
     const AmpDefinition* selectedAmp() const;
 
-    NamVXProcessor& proc;
+    NamKnobsProcessor& proc;
     AmpList ampModel;
     PresetList presetModel;
     juce::ListBox amps { "amps", &ampModel }, presets { "presets", &presetModel };
@@ -47,4 +47,4 @@ private:
     juce::Array<juce::File> presetFiles;
     juce::Rectangle<int> ampArea, presetArea;
 };
-} // namespace namvx
+} // namespace namknobs

@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cctype>
 
-namespace namvx
+namespace namknobs
 {
 bool NamLoader::isNamFile (const std::filesystem::path& p)
 {
@@ -42,4 +42,4 @@ LoadedCapture NamLoader::load (const std::filesystem::path& file)
     if (c.meta.expectedSampleRate <= 0) c.meta.expectedSampleRate = c.model->getModelSampleRate();
     return c;
 }
-} // namespace namvx
+} // namespace namknobs

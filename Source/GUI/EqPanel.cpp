@@ -1,6 +1,6 @@
 #include "EqPanel.h"
 
-namespace namvx
+namespace namknobs
 {
 namespace
 {
@@ -11,7 +11,7 @@ const juce::Colour bandColours[7] = { juce::Colour (0xff8fb4ff), juce::Colour (0
 bool isCut (int b) { return b == EqSettings::LowCut || b == EqSettings::HighCut; }
 } // namespace
 
-EqPanel::EqPanel (NamVXProcessor& p)
+EqPanel::EqPanel (NamKnobsProcessor& p)
     : proc (p), eqOn (p.getAPVTS(), pid::eqOn, "EQ on"), position (p.getAPVTS(), pid::eqPost),
       output (p.getAPVTS(), pid::eqOut, "Output")
 {
@@ -316,4 +316,4 @@ void EqPanel::resized()
     auto outCol = juce::Rectangle<int> (controlsArea.getX() + 7 * w, controlsArea.getY(), controlsArea.getRight() - (controlsArea.getX() + 7 * w), controlsArea.getHeight()).reduced (8, 8);
     output.setBounds (outCol.removeFromTop (110));
 }
-} // namespace namvx
+} // namespace namknobs

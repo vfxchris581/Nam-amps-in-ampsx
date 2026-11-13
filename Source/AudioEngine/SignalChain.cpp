@@ -1,6 +1,6 @@
 #include "SignalChain.h"
 
-namespace namvx
+namespace namknobs
 {
 static_assert (kBlendSlots == AmpDefinition::kMaxBlendModels, "slot counts must match");
 
@@ -344,4 +344,4 @@ int SignalChain::readSpectrumSamples (float* dest, int maxSamples) noexcept
     spectrumFifo.finishedRead (n1 + n2);
     return n1 + n2;
 }
-} // namespace namvx
+} // namespace namknobs

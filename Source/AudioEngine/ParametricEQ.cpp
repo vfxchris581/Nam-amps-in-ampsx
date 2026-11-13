@@ -2,7 +2,7 @@
 
 #include <complex>
 
-namespace namvx
+namespace namknobs
 {
 int ParametricEQ::sections (const EqBand& b, int idx, double sr, Biquad::Coeffs* out)
 {
@@ -139,4 +139,4 @@ void ParametricEQ::process (float* l, float* r, int n) noexcept
     float* ch[2] = { l, r };
     run (ch, 2, n);
 }
-} // namespace namvx
+} // namespace namknobs

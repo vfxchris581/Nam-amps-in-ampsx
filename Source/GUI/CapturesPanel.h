@@ -2,7 +2,7 @@
 #include "Widgets.h"
 #include "Plugin/PluginProcessor.h"
 
-namespace namvx
+namespace namknobs
 {
 /** NAM profile manager: every capture of the current amp, its channel and its knob mapping
     (detected from names, estimated from sound, or set by you), plus manual assignment of
@@ -10,7 +10,7 @@ namespace namvx
 class CapturesPanel : public juce::Component, private juce::TableListBoxModel
 {
 public:
-    explicit CapturesPanel (NamVXProcessor& p);
+    explicit CapturesPanel (NamKnobsProcessor& p);
     void refresh();
     void paint (juce::Graphics&) override;
     void resized() override;
@@ -29,7 +29,7 @@ private:
 
     class EditableCell;
 
-    NamVXProcessor& proc;
+    NamKnobsProcessor& proc;
     AmpDefinition working;
     bool dirty = false;
     std::vector<Row> rows;
@@ -46,4 +46,4 @@ private:
 
     enum Cols { colName = 1, colChannel, colFirstKnob, colTrim = colFirstKnob + kNumControls, colOn, colInfo };
 };
-} // namespace namvx
+} // namespace namknobs

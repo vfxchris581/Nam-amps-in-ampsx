@@ -2,13 +2,13 @@
 #include "Widgets.h"
 #include "Plugin/PluginProcessor.h"
 
-namespace namvx
+namespace namknobs
 {
 /** 12AX7 stage, power amp circuit, harmonic engine and engine quality settings. */
 class TubePanel : public juce::Component
 {
 public:
-    explicit TubePanel (NamVXProcessor& p);
+    explicit TubePanel (NamKnobsProcessor& p);
     void refresh();
     void paint (juce::Graphics&) override;
     void resized() override;
@@ -16,7 +16,7 @@ public:
 private:
     void pushOptions();
 
-    NamVXProcessor& proc;
+    NamKnobsProcessor& proc;
     Toggle preOn, paOn, harmOn;
     Knob preDrive, preMix;
     Choice tubeType;
@@ -28,4 +28,4 @@ private:
     juce::Label loudnessLabel { {}, "Capture loudness compensation" }, osLabel { {}, "Oversampling" }, maxLabel { {}, "Max blended captures" };
     juce::Rectangle<int> areas[4];
 };
-} // namespace namvx
+} // namespace namknobs

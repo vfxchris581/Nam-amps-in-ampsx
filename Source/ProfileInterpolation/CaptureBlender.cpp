@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace namvx
+namespace namknobs
 {
 // ---- FracDelay --------------------------------------------------------------------------------
 void FracDelay::prepare (int maxDelaySamples)
@@ -173,4 +173,4 @@ void CaptureBlender::process (const double* in, double* out, int n) noexcept
         sign[i] = si;
     }
 }
-} // namespace namvx
+} // namespace namknobs

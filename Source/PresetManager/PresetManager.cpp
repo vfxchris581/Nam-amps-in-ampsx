@@ -1,6 +1,6 @@
 #include "PresetManager.h"
 
-namespace namvx
+namespace namknobs
 {
 PresetManager::PresetManager (juce::File p, juce::File c) : dir (std::move (p)), cabDir (std::move (c))
 {
@@ -16,7 +16,8 @@ juce::String PresetManager::sanitise (const juce::String& name)
 
 juce::Array<juce::File> PresetManager::listPresets() const
 {
-    auto files = dir.findChildFiles (juce::File::findFiles, false, juce::String ("*") + kPresetExt);
+    // also list presets saved by earlier versions (Nam VX / Nam0 / Namified)
+    auto files = dir.findChildFiles (juce::File::findFiles, false, juce::String ("*") + kPresetExt + ";*.namvx;*.nam0;*.namified");
     files.sort();
     return files;
 }
@@ -58,7 +59,7 @@ juce::Array<juce::File> PresetManager::listCabPresets() const
 bool PresetManager::saveCabPreset (const CabPreset& p)
 {
     juce::DynamicObject::Ptr o = new juce::DynamicObject();
-    o->setProperty ("format", "namvx-cab");
+    o->setProperty ("format", "namknobs-cab");
     o->setProperty ("name", p.name);
     o->setProperty ("ir1", p.ir1Path);
     o->setProperty ("ir2", p.ir2Path);
@@ -80,4 +81,4 @@ bool PresetManager::loadCabPreset (const juce::File& f, CabPreset& out) const
         for (auto& nv : obj->getProperties()) out.values.set (nv.name, nv.value);
     return true;
 }
-} // namespace namvx
+} // namespace namknobs

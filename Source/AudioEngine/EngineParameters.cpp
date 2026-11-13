@@ -1,6 +1,6 @@
 #include "EngineParameters.h"
 
-namespace namvx
+namespace namknobs
 {
 const std::vector<ParamSpec>& parameterSpecs()
 {
@@ -84,4 +84,4 @@ const std::vector<ParamSpec>& parameterSpecs()
     }();
     return specs;
 }
-} // namespace namvx
+} // namespace namknobs

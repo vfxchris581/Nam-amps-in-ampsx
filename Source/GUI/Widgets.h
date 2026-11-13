@@ -2,9 +2,9 @@
 // Small reusable controls bound to APVTS parameters.
 
 #include <juce_audio_processors/juce_audio_processors.h>
-#include "NamVXLookAndFeel.h"
+#include "NamKnobsLookAndFeel.h"
 
-namespace namvx
+namespace namknobs
 {
 using APVTS = juce::AudioProcessorValueTreeState;
 
@@ -118,4 +118,4 @@ public:
 private:
     float level = 0.0f;
 };
-} // namespace namvx
+} // namespace namknobs

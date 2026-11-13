@@ -7,19 +7,19 @@
 #include "PresetManager/AmpLibrary.h"
 #include "PresetManager/PresetManager.h"
 
-namespace namvx
+namespace namknobs
 {
-class NamVXProcessor : public juce::AudioProcessor,
+class NamKnobsProcessor : public juce::AudioProcessor,
                           public juce::ChangeBroadcaster,
                           private juce::AudioProcessorValueTreeState::Listener,
                           private juce::AsyncUpdater,
                           private juce::Timer
 {
 public:
-    NamVXProcessor();
+    NamKnobsProcessor();
     /** For tools/tests: use a specific library folder. */
-    explicit NamVXProcessor (const juce::File& libraryRoot);
-    ~NamVXProcessor() override;
+    explicit NamKnobsProcessor (const juce::File& libraryRoot);
+    ~NamKnobsProcessor() override;
 
     // ---- AudioProcessor ------------------------------------------------------------------
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
@@ -31,7 +31,7 @@ public:
 
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
-    const juce::String getName() const override { return "Nam VX"; }
+    const juce::String getName() const override { return "Nam Knobs"; }
     bool acceptsMidi() const override { return false; }
     bool producesMidi() const override { return false; }
     double getTailLengthSeconds() const override { return 0.5; }
@@ -43,7 +43,7 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
-    // ---- Nam VX API (message thread) -----------------------------------------------------
+    // ---- Nam Knobs API (message thread) -----------------------------------------------------
     juce::AudioProcessorValueTreeState& getAPVTS() noexcept { return apvts; }
     AmpLibrary& getLibrary() noexcept { return *library; }
     PresetManager& getPresets() noexcept { return *presets; }
@@ -139,6 +139,6 @@ private:
     double preparedRate = 0.0;
     int preparedBlock = 0;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NamVXProcessor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NamKnobsProcessor)
 };
-} // namespace namvx
+} // namespace namknobs

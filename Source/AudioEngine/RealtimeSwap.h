@@ -7,7 +7,7 @@
 #include <atomic>
 #include <memory>
 
-namespace namvx
+namespace namknobs
 {
 template <typename T, int kRetireSlots = 8>
 class RealtimeSwap
@@ -73,4 +73,4 @@ private:
     T* current = nullptr; // audio-thread owned
     std::array<std::atomic<T*>, kRetireSlots> retired {};
 };
-} // namespace namvx
+} // namespace namknobs

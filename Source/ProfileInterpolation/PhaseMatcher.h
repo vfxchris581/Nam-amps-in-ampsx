@@ -9,7 +9,7 @@
 
 #include <vector>
 
-namespace namvx
+namespace namknobs
 {
 struct LagEstimate
 {
@@ -30,4 +30,4 @@ public:
     /** Minimum correlation for a correction to be trusted (unrelated captures are left alone). */
     static constexpr double kMinCorrelation = 0.2;
 };
-} // namespace namvx
+} // namespace namknobs

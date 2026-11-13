@@ -7,7 +7,7 @@
 #include <string>
 #include "AmplifierEngine/AmpDefinition.h"
 
-namespace namvx
+namespace namknobs
 {
 class ChannelManager
 {
@@ -36,4 +36,4 @@ public:
 private:
     static int channelRank (const std::string& name);
 };
-} // namespace namvx
+} // namespace namknobs

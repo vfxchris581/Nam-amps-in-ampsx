@@ -1,7 +1,7 @@
 #include "SincResampler.h"
 #include <cstring>
 
-namespace namvx
+namespace namknobs
 {
 namespace
 {
@@ -93,4 +93,4 @@ void SincResampler::process (const double* in, int n, SampleFifo& out) noexcept
         pos -= keepFrom;
     }
 }
-} // namespace namvx
+} // namespace namknobs

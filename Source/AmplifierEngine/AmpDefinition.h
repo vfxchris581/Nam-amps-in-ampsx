@@ -9,7 +9,7 @@
 #include "NAMMetadata/CaptureMetadata.h"
 #include "ProfileAnalyzer/ProfileAnalyzer.h"
 
-namespace namvx
+namespace namknobs
 {
 enum class CoordSource : int { Unknown = 0, Detected = 1, Estimated = 2, User = 3 };
 
@@ -56,4 +56,4 @@ nlohmann::json toJson (const AmpDefinition& a);
 AmpDefinition ampFromJson (const nlohmann::json& j);
 
 std::string makeId();
-} // namespace namvx
+} // namespace namknobs

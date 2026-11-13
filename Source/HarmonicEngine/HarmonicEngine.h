@@ -10,7 +10,7 @@
 
 #include "AudioEngine/DspCommon.h"
 
-namespace namvx
+namespace namknobs
 {
 class HarmonicEngine
 {
@@ -40,4 +40,4 @@ private:
     EnvelopeFollower envFast, envSlow, envLevel, envLow, envHigh;
     DcBlocker dc;
 };
-} // namespace namvx
+} // namespace namknobs

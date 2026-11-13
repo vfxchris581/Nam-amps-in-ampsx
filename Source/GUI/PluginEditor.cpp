@@ -1,8 +1,8 @@
 #include "PluginEditor.h"
 
-namespace namvx
+namespace namknobs
 {
-NamVXEditor::NamVXEditor (NamVXProcessor& p)
+NamKnobsEditor::NamKnobsEditor (NamKnobsProcessor& p)
     : AudioProcessorEditor (p), proc (p),
       ampPanel (p), capturesPanel (p), cabinetPanel (p), tubePanel (p), libraryPanel (p), toneMatrixPanel (p), eqPanel (p)
 {
@@ -64,15 +64,15 @@ NamVXEditor::NamVXEditor (NamVXProcessor& p)
     refreshAll();
 }
 
-NamVXEditor::~NamVXEditor()
+NamKnobsEditor::~NamKnobsEditor()
 {
     proc.removeChangeListener (this);
     setLookAndFeel (nullptr);
 }
 
-void NamVXEditor::changeListenerCallback (juce::ChangeBroadcaster*) { refreshAll(); }
+void NamKnobsEditor::changeListenerCallback (juce::ChangeBroadcaster*) { refreshAll(); }
 
-void NamVXEditor::refreshAll()
+void NamKnobsEditor::refreshAll()
 {
     ampSelector.clear (juce::dontSendNotification);
     int id = 1, sel = 0;
@@ -102,12 +102,12 @@ void NamVXEditor::refreshAll()
     toneMatrixPanel.refresh();
 }
 
-void NamVXEditor::paint (juce::Graphics& g)
+void NamKnobsEditor::paint (juce::Graphics& g)
 {
     g.fillAll (ui::bg);
 }
 
-void NamVXEditor::paintOverChildren (juce::Graphics& g)
+void NamKnobsEditor::paintOverChildren (juce::Graphics& g)
 {
     // header (drawn in the scaled content's coordinate space)
     const float s = (float) getWidth() / kWidth;
@@ -117,8 +117,8 @@ void NamVXEditor::paintOverChildren (juce::Graphics& g)
     g.setColour (ui::gold);
     const auto logoFont = ui::brand (28.0f).withExtraKerningFactor (0.04f);
     g.setFont (logoFont);
-    g.drawText ("Nam VX", logo, juce::Justification::centredLeft);
-    const float logoW = juce::GlyphArrangement::getStringWidth (logoFont, "Nam VX");
+    g.drawText ("Nam Knobs", logo, juce::Justification::centredLeft);
+    const float logoW = juce::GlyphArrangement::getStringWidth (logoFont, "Nam Knobs");
     g.setColour (ui::textDim);
     g.setFont (ui::semi (9.5f).withExtraKerningFactor (0.3f));
     g.drawText ("INTELLIGENT NAM AMPLIFIER", logo.translated (logoW + 18.0f, 2), juce::Justification::centredLeft);
@@ -135,7 +135,7 @@ void NamVXEditor::paintOverChildren (juce::Graphics& g)
     }
 }
 
-void NamVXEditor::resized()
+void NamKnobsEditor::resized()
 {
     content.setBounds (0, 0, kWidth, kHeight);
     content.setTransform (juce::AffineTransform::scale ((float) getWidth() / kWidth));
@@ -154,7 +154,7 @@ void NamVXEditor::resized()
     tabs.setBounds (r);
 }
 
-bool NamVXEditor::isInterestedInFileDrag (const juce::StringArray& files)
+bool NamKnobsEditor::isInterestedInFileDrag (const juce::StringArray& files)
 {
     for (auto& f : files)
     {
@@ -164,7 +164,7 @@ bool NamVXEditor::isInterestedInFileDrag (const juce::StringArray& files)
     return false;
 }
 
-void NamVXEditor::filesDropped (const juce::StringArray& files, int, int)
+void NamKnobsEditor::filesDropped (const juce::StringArray& files, int, int)
 {
     dragging = false;
     juce::StringArray nams, errors;
@@ -218,4 +218,4 @@ void NamVXEditor::filesDropped (const juce::StringArray& files, int, int)
         juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "Impulse responses", errors.joinIntoString ("\n\n"));
     repaint();
 }
-} // namespace namvx
+} // namespace namknobs

@@ -1,6 +1,6 @@
-// Renders the real Nam VX editor (every tab) to PNG files with a demo library built from the
+// Renders the real Nam Knobs editor (every tab) to PNG files with a demo library built from the
 // NeuralAmpModelerCore example models. Used for README/documentation previews and as a UI smoke
-// test.  Usage:  NamVXScreenshot <output-dir>
+// test.  Usage:  NamKnobsScreenshot <output-dir>
 
 #include <fstream>
 #include <json.hpp>
@@ -9,16 +9,16 @@
 
 namespace
 {
-using namespace namvx;
+using namespace namknobs;
 
 void writeDemoCapture (const juce::File& dir, const juce::String& file, const juce::String& name, const char* source = "wavenet.nam")
 {
-    std::ifstream in (juce::File (NAMVX_EXAMPLE_MODELS).getChildFile (source).getFullPathName().toStdString());
+    std::ifstream in (juce::File (NAMKNOBS_EXAMPLE_MODELS).getChildFile (source).getFullPathName().toStdString());
     nlohmann::json j; in >> j;
     j["metadata"]["gear_make"] = "Demo Amplification";
     j["metadata"]["gear_model"] = "Lead 100";
     j["metadata"]["name"] = name.toStdString();
-    j["metadata"]["modeled_by"] = "Nam VX demo";
+    j["metadata"]["modeled_by"] = "Nam Knobs demo";
     std::ofstream out (dir.getChildFile (file + ".nam").getFullPathName().toStdString());
     out << j.dump();
 }
@@ -56,14 +56,14 @@ juce::File writeDemoIR (const juce::File& dir, const juce::String& name, double 
 class ScreenshotApp : public juce::JUCEApplication, private juce::Timer
 {
 public:
-    const juce::String getApplicationName() override { return "NamVXScreenshot"; }
+    const juce::String getApplicationName() override { return "NamKnobsScreenshot"; }
     const juce::String getApplicationVersion() override { return "1.0"; }
 
     void initialise (const juce::String& cmd) override
     {
         outDir = juce::File::getCurrentWorkingDirectory().getChildFile (cmd.isEmpty() ? "screenshots" : cmd.unquoted());
         outDir.createDirectory();
-        auto root = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("namvx_screenshot");
+        auto root = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("namknobs_screenshot");
         root.deleteRecursively();
         auto caps = root.getChildFile ("captures");
         caps.createDirectory();
@@ -95,7 +95,7 @@ public:
             for (auto& e : extra) files.push_back (bl.getChildFile (juce::String (e[0]) + ".nam").getFullPathName().toStdString());
             blendId = lib.createBlend ("Ten Amp Stack", files, err);
         }
-        processor = std::make_unique<NamVXProcessor> (root);
+        processor = std::make_unique<NamKnobsProcessor> (root);
         for (auto& a : processor->getLibrary().getAmps())
             if (! a.isBlend) { processor->loadAmp (a.id); break; }
         processor->loadImpulseResponse (0, writeDemoIR (root, "4x12 V30 SM57 Cap Edge", 48000, 0.35f, 1));
@@ -109,7 +109,7 @@ public:
         setP ("gain", 6.5f); setP ("bass", 5.5f); setP ("middle", 6.0f); setP ("treble", 6.5f);
         setP ("presence", 6.0f); setP ("resonance", 4.5f); setP ("volume", 6.0f); setP ("master", 4.0f);
         setP (pid::harmOn, 1.0f); setP (pid::cabOn, 1.0f);
-        editor.reset (dynamic_cast<NamVXEditor*> (processor->createEditor()));
+        editor.reset (dynamic_cast<NamKnobsEditor*> (processor->createEditor()));
         processor->setPlayConfigDetails (2, 2, 48000.0, 512);
         processor->prepareToPlay (48000.0, 512);
         startTimer (3000); // let the background runtime build finish and the UI settle
@@ -145,7 +145,7 @@ public:
         // phase 3: blend shots
         auto shot = [this] (int tab, const char* file) {
             editor->showTab (tab);
-            editor->setSize (NamVXEditor::kWidth, NamVXEditor::kHeight);
+            editor->setSize (NamKnobsEditor::kWidth, NamKnobsEditor::kHeight);
             auto img = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.5f);
             auto f = outDir.getChildFile (file);
             f.deleteFile();
@@ -153,9 +153,9 @@ public:
             if (auto os = f.createOutputStream()) png.writeImageToStream (img, *os);
             std::printf ("wrote %s\n", f.getFullPathName().toRawUTF8());
         };
-        shot (NamVXEditor::tabAmp, "namvx-blend.png");
-        shot (NamVXEditor::tabToneMatrix, "namvx-tone-matrix-manual.png");
-        shot (NamVXEditor::tabLibrary, "namvx-library.png");
+        shot (NamKnobsEditor::tabAmp, "namknobs-blend.png");
+        shot (NamKnobsEditor::tabToneMatrix, "namknobs-tone-matrix-manual.png");
+        shot (NamKnobsEditor::tabLibrary, "namknobs-library.png");
         if (auto* prm = processor->getAPVTS().getParameter (pid::matrixAuto)) prm->setValueNotifyingHost (1.0f);
         auto setK = [this] (const char* id, float v) {
             if (auto* prm = processor->getAPVTS().getParameter (id)) prm->setValueNotifyingHost (prm->convertTo0to1 (v)); };
@@ -169,9 +169,9 @@ public:
 
     void autoShot()
     {
-        editor->showTab (NamVXEditor::tabToneMatrix);
+        editor->showTab (NamKnobsEditor::tabToneMatrix);
         auto img = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.5f);
-        auto f = outDir.getChildFile ("namvx-tone-matrix.png");
+        auto f = outDir.getChildFile ("namknobs-tone-matrix.png");
         f.deleteFile();
         juce::PNGImageFormat png;
         if (auto os = f.createOutputStream()) png.writeImageToStream (img, *os);
@@ -212,9 +212,9 @@ public:
         for (int t = 0; t < 7; ++t)
         {
             editor->showTab (t);
-            editor->setSize (NamVXEditor::kWidth, NamVXEditor::kHeight);
+            editor->setSize (NamKnobsEditor::kWidth, NamKnobsEditor::kHeight);
             auto img = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.5f);
-            auto f = outDir.getChildFile (juce::String ("namvx-") + names[t] + ".png");
+            auto f = outDir.getChildFile (juce::String ("namknobs-") + names[t] + ".png");
             f.deleteFile();
             juce::PNGImageFormat png;
             if (auto os = f.createOutputStream()) png.writeImageToStream (img, *os);
@@ -249,8 +249,8 @@ private:
     juce::File outDir;
     std::string blendId;
     int phase = 0;
-    std::unique_ptr<NamVXProcessor> processor;
-    std::unique_ptr<NamVXEditor> editor;
+    std::unique_ptr<NamKnobsProcessor> processor;
+    std::unique_ptr<NamKnobsEditor> editor;
 };
 
 START_JUCE_APPLICATION (ScreenshotApp)

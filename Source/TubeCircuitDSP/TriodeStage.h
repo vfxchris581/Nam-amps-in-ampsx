@@ -16,7 +16,7 @@
 #include <vector>
 #include "AudioEngine/DspCommon.h"
 
-namespace namvx
+namespace namknobs
 {
 struct KorenTriode
 {
@@ -56,4 +56,4 @@ private:
     double drive = 0.3, smallSignalGain = 50.0;
     DcBlocker dc;
 };
-} // namespace namvx
+} // namespace namknobs

@@ -12,7 +12,7 @@
 #include <NAM/sequential.h>
 #include <NAM/wavenet/model.h>
 
-namespace namvx
+namespace namknobs
 {
 namespace
 {
@@ -134,4 +134,4 @@ double NamModel::getInputLevelDbu() const noexcept
 {
     return hasInputLevel() ? const_cast<nam::DSP&> (*dsp).GetInputLevel() : 12.2;
 }
-} // namespace namvx
+} // namespace namknobs

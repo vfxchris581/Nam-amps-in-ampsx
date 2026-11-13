@@ -2,7 +2,7 @@
 #include "Widgets.h"
 #include "Plugin/PluginProcessor.h"
 
-namespace namvx
+namespace namknobs
 {
 /** Eight NAM loaders that play as one amp.
     Top: the eight loader slots. Middle: a real amp faceplate (Gain, Volume, Bass, Middle, Treble,
@@ -12,7 +12,7 @@ namespace namvx
 class ToneMatrixPanel : public juce::Component, private juce::Timer
 {
 public:
-    explicit ToneMatrixPanel (NamVXProcessor& p);
+    explicit ToneMatrixPanel (NamKnobsProcessor& p);
     ~ToneMatrixPanel() override;
     void refresh();
     void paint (juce::Graphics&) override;
@@ -30,7 +30,7 @@ private:
     void applyAutoState();
     juce::String paramId (int row, int slot) const;
 
-    NamVXProcessor& proc;
+    NamKnobsProcessor& proc;
     std::vector<std::unique_ptr<Knob>> ampKnobs;
     std::unique_ptr<MatrixCell> cells[kRows][kSlots];
     std::unique_ptr<APVTS::SliderAttachment> attach[kRows][kSlots];
@@ -50,4 +50,4 @@ private:
     juce::Rectangle<int> slotsArea, plate, matrixArea, grid;
     int labelW = 104, readW = 58;
 };
-} // namespace namvx
+} // namespace namknobs

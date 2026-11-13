@@ -18,7 +18,7 @@
 #include "ProfileInterpolator.h"
 #include "AudioEngine/DspCommon.h"
 
-namespace namvx
+namespace namknobs
 {
 struct BlendSource
 {
@@ -90,4 +90,4 @@ private:
     PhaseMode mode = PhaseMode::PhaseMatched;
     bool alwaysOn = false;
 };
-} // namespace namvx
+} // namespace namknobs

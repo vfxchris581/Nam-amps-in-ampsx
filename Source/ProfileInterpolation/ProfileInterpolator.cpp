@@ -4,7 +4,7 @@
 #include <cmath>
 #include <set>
 
-namespace namvx
+namespace namknobs
 {
 void ProfileInterpolator::setCaptures (const std::vector<KnobCoords>& coords, const std::vector<bool>& enabled)
 {
@@ -105,4 +105,4 @@ InterpolationResult ProfileInterpolator::compute (const KnobCoords& knobs) const
     }
     return r;
 }
-} // namespace namvx
+} // namespace namknobs

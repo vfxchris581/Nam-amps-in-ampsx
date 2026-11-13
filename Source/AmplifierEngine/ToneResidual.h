@@ -9,7 +9,7 @@
 #include "AudioEngine/DspCommon.h"
 #include "NAMMetadata/CaptureMetadata.h"
 
-namespace namvx
+namespace namknobs
 {
 struct ResidualAmounts
 {
@@ -45,4 +45,4 @@ private:
     Smoothed sBass, sMid, sTreble, sPres, sRes;
     bool prInPA = false;
 };
-} // namespace namvx
+} // namespace namknobs

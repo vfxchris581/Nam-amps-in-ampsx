@@ -2,7 +2,7 @@
 
 #include <algorithm>
 
-namespace namvx
+namespace namknobs
 {
 int ChannelManager::addCapture (AmpDefinition& amp, CaptureEntry capture, const std::string& forcedChannel)
 {
@@ -119,4 +119,4 @@ void ChannelManager::refreshEstimates (ChannelDefinition& ch)
                 ch.captures[i].source[(size_t) d] = CoordSource::Estimated;
             }
 }
-} // namespace namvx
+} // namespace namknobs

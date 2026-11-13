@@ -6,7 +6,7 @@
 #include <atomic>
 #include "IRLoader/IRSlot.h"
 
-namespace namvx
+namespace namknobs
 {
 class DualCabinet
 {
@@ -46,4 +46,4 @@ private:
     juce::AudioBuffer<float> b1, b2;
     juce::SmoothedValue<float> w1, w2, level;
 };
-} // namespace namvx
+} // namespace namknobs

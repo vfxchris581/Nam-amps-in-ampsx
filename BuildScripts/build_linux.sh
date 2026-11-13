@@ -3,6 +3,6 @@
 # libxcursor-dev libfreetype6-dev libfontconfig1-dev
 set -euo pipefail
 cd "$(dirname "$0")/.."
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DNAMVX_BUILD_SCREENSHOT=ON
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DNAMKNOBS_BUILD_SCREENSHOT=ON
 cmake --build build --parallel
 (cd build && ctest --output-on-failure)

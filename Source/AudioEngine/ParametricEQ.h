@@ -7,7 +7,7 @@
 #include <array>
 #include "DspCommon.h"
 
-namespace namvx
+namespace namknobs
 {
 struct EqBand
 {
@@ -57,4 +57,4 @@ private:
     Smoothed outGain;
     bool dirty = true;
 };
-} // namespace namvx
+} // namespace namknobs

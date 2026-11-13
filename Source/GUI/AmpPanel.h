@@ -2,13 +2,13 @@
 #include "Widgets.h"
 #include "Plugin/PluginProcessor.h"
 
-namespace namvx
+namespace namknobs
 {
 /** The amplifier: faceplate generated from the loaded amp (name, channels, eight controls). */
 class AmpPanel : public juce::Component, private juce::Timer
 {
 public:
-    explicit AmpPanel (NamVXProcessor& p);
+    explicit AmpPanel (NamKnobsProcessor& p);
     void refresh();
     void paint (juce::Graphics&) override;
     void resized() override;
@@ -17,7 +17,7 @@ private:
     void timerCallback() override;
     juce::Rectangle<int> plateBounds() const;
 
-    NamVXProcessor& proc;
+    NamKnobsProcessor& proc;
     std::vector<std::unique_ptr<Knob>> knobs;
     juce::OwnedArray<juce::TextButton> channelButtons;
     Knob input, output;
@@ -29,4 +29,4 @@ private:
     juce::String ampName, manufacturer;
     int lastChannelCount = -1;
 };
-} // namespace namvx
+} // namespace namknobs

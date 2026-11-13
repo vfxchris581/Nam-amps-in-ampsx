@@ -17,7 +17,7 @@
 #include <vector>
 #include "NAMMetadata/CaptureMetadata.h"
 
-namespace namvx
+namespace namknobs
 {
 struct InterpolationResult
 {
@@ -52,4 +52,4 @@ private:
     int maxActive = 3;
     double power = 2.0;
 };
-} // namespace namvx
+} // namespace namknobs

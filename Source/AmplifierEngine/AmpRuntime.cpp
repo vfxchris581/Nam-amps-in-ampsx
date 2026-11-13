@@ -4,7 +4,7 @@
 #include "ProfileAnalyzer/ProfileAnalyzer.h"
 #include "ProfileInterpolation/PhaseMatcher.h"
 
-namespace namvx
+namespace namknobs
 {
 std::unique_ptr<AmpRuntime> AmpRuntime::build (const AmpDefinition& def, double sr, int maxBlock,
                                                const RuntimeOptions& opts, std::vector<std::string>& errors)
@@ -311,4 +311,4 @@ int AmpRuntime::numRunningModels (int channel) const noexcept
 {
     return channel >= 0 && channel < (int) channels.size() ? channels[(size_t) channel].blender.numRunning() : 0;
 }
-} // namespace namvx
+} // namespace namknobs

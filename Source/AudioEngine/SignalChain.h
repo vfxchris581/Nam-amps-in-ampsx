@@ -1,5 +1,5 @@
 #pragma once
-// The complete Nam VX signal path:
+// The complete Nam Knobs signal path:
 //
 //  in → input gain → [OS] 12AX7 stage [/OS] → gain residual → NAM capture blend (channel xfade)
 //     → make-up · volume → tone residual EQ → [OS] harmonic engine → power amp (master) [/OS]
@@ -22,7 +22,7 @@
 #include "Convolution/DualCabinet.h"
 #include "ParametricEQ.h"
 
-namespace namvx
+namespace namknobs
 {
 class SignalChain
 {
@@ -105,4 +105,4 @@ private:
     std::array<double, kBlendSlots> effGain {};
     std::array<std::array<double, kBlendSlots>, 5> effBands {};
 };
-} // namespace namvx
+} // namespace namknobs

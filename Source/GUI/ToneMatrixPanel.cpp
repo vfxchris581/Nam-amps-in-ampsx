@@ -1,6 +1,6 @@
 #include "ToneMatrixPanel.h"
 
-namespace namvx
+namespace namknobs
 {
 namespace
 {
@@ -45,7 +45,7 @@ juce::String ToneMatrixPanel::paramId (int row, int slot) const
     return row == 0 ? juce::String (pid::blendMix[slot]) : juce::String (pid::toneSource[row - 1][slot]);
 }
 
-ToneMatrixPanel::ToneMatrixPanel (NamVXProcessor& p)
+ToneMatrixPanel::ToneMatrixPanel (NamKnobsProcessor& p)
     : proc (p), phase (p.getAPVTS(), pid::phaseMode), autoToggle (p.getAPVTS(), pid::matrixAuto, "Auto (knobs blend the captures)")
 {
     for (int k = 0; k < kNumControls; ++k)
@@ -287,4 +287,4 @@ void ToneMatrixPanel::resized()
         }
     }
 }
-} // namespace namvx
+} // namespace namknobs

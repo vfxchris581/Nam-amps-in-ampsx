@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <complex>
 
-namespace namvx
+namespace namknobs
 {
 Biquad::Coeffs ToneMatch::sectionCoeffs (int band, double sr, double g)
 {
@@ -128,4 +128,4 @@ void ToneMatch::process (double* x, int n) noexcept
         }
     }
 }
-} // namespace namvx
+} // namespace namknobs

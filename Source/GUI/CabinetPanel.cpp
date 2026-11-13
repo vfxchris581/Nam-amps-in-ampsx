@@ -1,8 +1,8 @@
 #include "CabinetPanel.h"
 
-namespace namvx
+namespace namknobs
 {
-CabinetPanel::Slot::Slot (NamVXProcessor& p, int i)
+CabinetPanel::Slot::Slot (NamKnobsProcessor& p, int i)
 {
     auto& s = p.getAPVTS();
     on = std::make_unique<Toggle> (s, i == 0 ? pid::ir1On : pid::ir2On, "On");
@@ -19,7 +19,7 @@ CabinetPanel::Slot::Slot (NamVXProcessor& p, int i)
     }
 }
 
-CabinetPanel::CabinetPanel (NamVXProcessor& p)
+CabinetPanel::CabinetPanel (NamKnobsProcessor& p)
     : proc (p), s1 (p, 0), s2 (p, 1),
       blend (p.getAPVTS(), pid::cabBlend, "IR Blend"), level (p.getAPVTS(), pid::cabLevel, "Cab Level"),
       stereo (p.getAPVTS(), pid::cabStereo, "Stereo"), autoAlign (p.getAPVTS(), pid::cabAutoAlign, "Auto phase align")
@@ -191,4 +191,4 @@ void CabinetPanel::resized()
     gA.removeFromTop (8);
     saveCab.setBounds (gA.removeFromTop (32));
 }
-} // namespace namvx
+} // namespace namknobs

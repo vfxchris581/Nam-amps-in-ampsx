@@ -1,7 +1,7 @@
 #include "LibraryPanel.h"
 #include "ChannelManager/ChannelManager.h"
 
-namespace namvx
+namespace namknobs
 {
 int LibraryPanel::AmpList::getNumRows() { return (int) owner->proc.getLibrary().getAmps().size(); }
 
@@ -51,7 +51,7 @@ void LibraryPanel::PresetList::listBoxItemDoubleClicked (int row, const juce::Mo
     if (row < owner->presetFiles.size()) owner->proc.loadPreset (owner->presetFiles[row]);
 }
 
-LibraryPanel::LibraryPanel (NamVXProcessor& p) : proc (p)
+LibraryPanel::LibraryPanel (NamKnobsProcessor& p) : proc (p)
 {
     ampModel.owner = this;
     presetModel.owner = this;
@@ -237,4 +237,4 @@ void LibraryPanel::resized()
     p.removeFromBottom (10);
     presets.setBounds (p);
 }
-} // namespace namvx
+} // namespace namknobs

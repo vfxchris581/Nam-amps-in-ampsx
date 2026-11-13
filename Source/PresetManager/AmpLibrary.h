@@ -14,7 +14,7 @@
 #include <vector>
 #include "AmplifierEngine/AmpDefinition.h"
 
-namespace namvx
+namespace namknobs
 {
 struct PendingCapture
 {
@@ -77,4 +77,4 @@ private:
     std::filesystem::path root;
     std::vector<AmpDefinition> amps;
 };
-} // namespace namvx
+} // namespace namknobs

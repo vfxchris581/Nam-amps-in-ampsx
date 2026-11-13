@@ -4,7 +4,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
-namespace namvx
+namespace namknobs
 {
 namespace ui
 {
@@ -34,10 +34,10 @@ namespace ui
     void drawLed (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour c, bool on);
 }
 
-class NamVXLookAndFeel : public juce::LookAndFeel_V4
+class NamKnobsLookAndFeel : public juce::LookAndFeel_V4
 {
 public:
-    NamVXLookAndFeel();
+    NamKnobsLookAndFeel();
 
     void drawRotarySlider (juce::Graphics&, int x, int y, int w, int h, float pos, float start, float end,
                            juce::Slider&) override;
@@ -56,4 +56,4 @@ public:
     void drawLinearSlider (juce::Graphics&, int x, int y, int w, int h, float pos, float min, float max,
                            juce::Slider::SliderStyle, juce::Slider&) override;
 };
-} // namespace namvx
+} // namespace namknobs

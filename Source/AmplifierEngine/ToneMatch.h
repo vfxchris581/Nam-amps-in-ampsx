@@ -10,7 +10,7 @@
 #include <array>
 #include "AudioEngine/DspCommon.h"
 
-namespace namvx
+namespace namknobs
 {
 class ToneMatch
 {
@@ -43,4 +43,4 @@ private:
     Bands target {}, current {}, section {};
     bool active = false;
 };
-} // namespace namvx
+} // namespace namknobs

@@ -7,15 +7,15 @@
 #include "ToneMatrixPanel.h"
 #include "EqPanel.h"
 
-namespace namvx
+namespace namknobs
 {
-class NamVXEditor : public juce::AudioProcessorEditor,
+class NamKnobsEditor : public juce::AudioProcessorEditor,
                        public juce::FileDragAndDropTarget,
                        private juce::ChangeListener
 {
 public:
-    explicit NamVXEditor (NamVXProcessor&);
-    ~NamVXEditor() override;
+    explicit NamKnobsEditor (NamKnobsProcessor&);
+    ~NamKnobsEditor() override;
 
     void paint (juce::Graphics&) override;
     void paintOverChildren (juce::Graphics&) override;
@@ -34,8 +34,8 @@ private:
     void changeListenerCallback (juce::ChangeBroadcaster*) override;
     void refreshAll();
 
-    NamVXProcessor& proc;
-    NamVXLookAndFeel lnf;
+    NamKnobsProcessor& proc;
+    NamKnobsLookAndFeel lnf;
     juce::Component content;
     juce::ComboBox ampSelector, presetSelector;
     juce::TextButton prevPreset { "<" }, nextPreset { ">" }, savePreset { "Save" };
@@ -49,4 +49,4 @@ private:
     EqPanel eqPanel;
     bool dragging = false;
 };
-} // namespace namvx
+} // namespace namknobs

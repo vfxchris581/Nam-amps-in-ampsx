@@ -12,7 +12,7 @@
 
 #include "AudioEngine/DspCommon.h"
 
-namespace namvx
+namespace namknobs
 {
 struct KorenPentode
 {
@@ -59,4 +59,4 @@ private:
     Biquad fbPresence, fbResonance, spkLow, spkHigh;
     DcBlocker dc;
 };
-} // namespace namvx
+} // namespace namknobs

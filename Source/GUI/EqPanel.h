@@ -3,14 +3,14 @@
 #include "Widgets.h"
 #include "Plugin/PluginProcessor.h"
 
-namespace namvx
+namespace namknobs
 {
 /** Studio EQ: response curve with draggable band nodes over a live spectrum analyser,
     and per-band controls (on, frequency, gain, Q / slope). */
 class EqPanel : public juce::Component, private juce::Timer
 {
 public:
-    explicit EqPanel (NamVXProcessor& p);
+    explicit EqPanel (NamKnobsProcessor& p);
     ~EqPanel() override;
     void refresh() {}
     void paint (juce::Graphics&) override;
@@ -32,7 +32,7 @@ private:
     int hitNode (juce::Point<float> p) const;
     void setParam (const char* id, float value);
 
-    NamVXProcessor& proc;
+    NamKnobsProcessor& proc;
     Toggle eqOn;
     Choice position;
     Knob output;
@@ -56,4 +56,4 @@ private:
     std::vector<float> incoming = std::vector<float> (16384, 0.0f);
     int ringPos = 0;
 };
-} // namespace namvx
+} // namespace namknobs

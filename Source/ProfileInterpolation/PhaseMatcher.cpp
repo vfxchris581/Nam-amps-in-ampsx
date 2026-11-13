@@ -5,7 +5,7 @@
 #include <random>
 #include "AudioEngine/DspCommon.h"
 
-namespace namvx
+namespace namknobs
 {
 LagEstimate PhaseMatcher::estimate (const std::vector<double>& ref, const std::vector<double>& sig, int maxLag)
 {
@@ -67,4 +67,4 @@ std::vector<double> PhaseMatcher::makeProbe (double sr, double seconds)
     }
     return x;
 }
-} // namespace namvx
+} // namespace namknobs
