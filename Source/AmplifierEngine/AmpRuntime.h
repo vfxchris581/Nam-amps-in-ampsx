@@ -60,6 +60,12 @@ public:
 
     /** Audio thread: phase handling for every channel (Off / Time-aligned / Phase-matched). */
     void setPhaseMode (PhaseMode m) noexcept;
+    /** Audio thread: level match every capture to the same loudness (on by default). */
+    void setLevelMatch (bool on) noexcept;
+    /** Level-match correction (dB) of the capture in a blend slot; NaN if the slot is empty. */
+    double matchDbForSlot (int channel, int slot) const noexcept;
+    /** Level-match correction (dB) of a channel's n-th capture. */
+    double matchDb (int channel, int source) const noexcept;
     /** Audio thread, blends: user polarity per slot (true = inverted). */
     void setSlotPolarity (int channel, const std::array<bool, AmpDefinition::kMaxBlendModels>& invert) noexcept;
     /** Measured phase relationship (for display/tests): lag in samples, polarity, correlation. */

@@ -3,6 +3,9 @@
 #include <algorithm>
 #include "ProfileAnalyzer/ProfileAnalyzer.h"
 #include "ProfileInterpolation/PhaseMatcher.h"
+#include "LevelMatch.h"
+#include <cmath>
+#include <limits>
 
 namespace namknobs
 {
@@ -69,7 +72,10 @@ std::unique_ptr<AmpRuntime> AmpRuntime::build (const AmpDefinition& def, double 
             double loud = opts.referenceLoudnessDb;
             if (allMeta) loud = *cap->meta.loudnessDb;
             else if (cap->analysis && cap->analysis->valid) loud = cap->analysis->loudnessDb;
-            s.staticGain = dbToGain (opts.loudnessCompensation * (opts.referenceLoudnessDb - loud) + cap->trimDb);
+            s.staticGain = dbToGain (cap->trimDb);
+            // fallback if the capture can't be measured below: stored / analysed loudness
+            s.matchDb = std::clamp (opts.referenceLoudnessDb - loud, -LevelMatch::kMaxCorrectionDb, LevelMatch::kMaxCorrectionDb);
+            s.matchGain = dbToGain (s.matchDb);
 
             if (cap->analysis && cap->analysis->valid)
             {
@@ -78,6 +84,27 @@ std::unique_ptr<AmpRuntime> AmpRuntime::build (const AmpDefinition& def, double 
                 s.intrinsicLatency = (int) std::lround (cap->analysis->latencySamples * sr / cap->analysis->sampleRate);
             }
             sources.push_back (s);
+        }
+
+        // Level match: play every capture the same guitar phrase and measure how loud it sounds.
+        {
+            const auto phrase = LevelMatch::testPhrase (sr);
+            std::vector<double> y (phrase.size()), buf ((size_t) maxBlock), zeros ((size_t) maxBlock, 0.0);
+            for (auto& s : sources)
+            {
+                for (size_t p = 0; p < phrase.size(); p += (size_t) maxBlock)
+                {
+                    const int n = (int) std::min ((size_t) maxBlock, phrase.size() - p);
+                    s.model->process (phrase.data() + p, y.data() + p, n);
+                }
+                const double loud = LevelMatch::loudnessDb (y, sr);
+                if (loud > -120.0)
+                {
+                    s.matchDb = LevelMatch::correctionDb (loud);
+                    s.matchGain = dbToGain (s.matchDb);
+                }
+                for (int f = 0; f < (int) (0.4 * sr) / maxBlock + 1; ++f) s.model->process (zeros.data(), buf.data(), maxBlock);
+            }
         }
 
         // Phase matching: play one probe through every capture, time-align by latency, then measure
@@ -280,6 +307,27 @@ AmpRuntime::AutoBlend AmpRuntime::autoBlend (int channel, const KnobCoords& k) c
 void AmpRuntime::setPhaseMode (PhaseMode m) noexcept
 {
     for (auto& ch : channels) ch.blender.setPhaseMode (m);
+}
+
+void AmpRuntime::setLevelMatch (bool on) noexcept
+{
+    for (auto& ch : channels) ch.blender.setLevelMatch (on);
+}
+
+double AmpRuntime::matchDb (int channel, int source) const noexcept
+{
+    if (channel < 0 || channel >= (int) channels.size()) return 0.0;
+    const auto& ch = channels[(size_t) channel];
+    return source >= 0 && source < ch.blender.numSources() ? ch.blender.source (source).matchDb : 0.0;
+}
+
+double AmpRuntime::matchDbForSlot (int channel, int slot) const noexcept
+{
+    if (channel < 0 || channel >= (int) channels.size()) return std::numeric_limits<double>::quiet_NaN();
+    const auto& ch = channels[(size_t) channel];
+    for (int i = 0; i < ch.blender.numSources() && i < (int) ch.slot.size(); ++i)
+        if (ch.slot[(size_t) i] == slot) return ch.blender.source (i).matchDb;
+    return std::numeric_limits<double>::quiet_NaN();
 }
 
 void AmpRuntime::setSlotPolarity (int channel, const std::array<bool, AmpDefinition::kMaxBlendModels>& invert) noexcept

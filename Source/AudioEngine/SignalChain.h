@@ -68,6 +68,7 @@ public:
     std::atomic<int> runningModels { 0 };
     std::atomic<bool> hasAmp { false };
     std::atomic<int> currentRuntimeChannels { 0 };
+    std::array<std::atomic<float>, kBlendSlots> slotMatchDb {}; // level-match correction per blend slot (NaN = empty)
     std::array<std::atomic<float>, 5> toneCorrectionDb {}; // blend tone transfer per band (UI read-out)
     std::array<std::array<std::atomic<float>, kBlendSlots>, 6> matrixWeights {}; // effective matrix (rows: gain, res..pres)
 
@@ -83,8 +84,8 @@ private:
     EngineParameters params;
     RealtimeSwap<AmpRuntime> runtimes;
     AmpRuntime* fadingOut = nullptr;
-    int ampFade = 0, ampFadeLen = 1;
-    int lastChannel = 0, prevChannel = -1, chanFade = 0, chanFadeLen = 1;
+    int ampFade = 0, ampFadeLen = 1, ampWarm = 0;
+    int lastChannel = 0, prevChannel = -1, chanFade = 0, chanFadeLen = 1, chanWarm = 0, chanWarmLen = 1;
 
     std::unique_ptr<juce::dsp::Oversampling<double>> osPre, osPost;
     TriodeStage triode;

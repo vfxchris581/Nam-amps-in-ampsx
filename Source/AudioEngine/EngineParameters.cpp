@@ -76,6 +76,9 @@ const std::vector<ParamSpec>& parameterSpecs()
         }
         b (pid::matrixAuto, "Tone Matrix Auto", true);
         c (pid::phaseMode, "Blend Phase", { "Off", "Time-aligned", "Phase-matched" }, 2);
+        b (pid::levelMatch, "Level Match", true);
+        for (int t = 0; t < 5; ++t)
+            f (pid::toneTrim[t], std::string (pid::toneBandName[t]) + " Fine Tune", -6.0, 6.0, 0.0, "dB");
         for (int i = 0; i < kBlendSlots; ++i)
             b (pid::slotInvert[i], "Slot " + std::to_string (i + 1) + " Polarity", false);
         for (int i = 0; i < kBlendSlots; ++i)

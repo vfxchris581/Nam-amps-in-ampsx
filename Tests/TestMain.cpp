@@ -30,6 +30,7 @@
 #include "AudioEngine/SignalChain.h"
 #include "AudioEngine/NoiseGate.h"
 #include "AudioEngine/PitchDetector.h"
+#include "AmplifierEngine/LevelMatch.h"
 
 namespace fs = std::filesystem;
 using namespace namknobs;
@@ -587,8 +588,8 @@ TEST (runtime_treble_knob_moves_between_captures)
     auto x = tst::sine (330.0, 48000, 48000, 0.2);
     std::vector<double> yb (x.size());
     for (size_t i = 0; i < x.size(); i += 256) b.process (x.data() + i, yb.data() + i, (int) std::min<size_t> (256, x.size() - i));
-    const double gB = dbToGain (opt.loudnessCompensation * (opt.referenceLoudnessDb - *def.channels[0].captures[1].meta.loudnessDb));
-    // amplitude at 330 Hz: runtime(treble 8) ≈ capture B (after its loudness normalisation)
+    const double gB = dbToGain (rt->matchDb (0, 1));
+    // amplitude at 330 Hz: runtime(treble 8) ≈ capture B (after its level match)
     const double t8 = tst::tone (y8, 24000, 16384, 330, 48000), tb = tst::tone (yb, 24000, 16384, 330, 48000) * gB;
     const double t2 = tst::tone (y2, 24000, 16384, 330, 48000);
     INFO ("330 Hz level: treble2 %.4f  treble8 %.4f  captureB %.4f", t2, t8, tb);
@@ -1070,36 +1071,45 @@ TEST (channel_and_amp_switching_is_click_free)
     const double fs = 48000;
     const auto dir = tempDir ("click");
     auto def = twoCaptureAmp (dir);
-    SignalChain chain;
-    chain.prepare (fs, 256);
-    std::vector<std::string> errors;
-    chain.publishRuntime (AmpRuntime::build (def, fs, 256, {}, errors));
-    EngineParameters p; p.cabOn = false;
-
-    auto x = tst::sine (110.0, fs, 48000 * 3, 0.3);
-    std::vector<double> y (x.size()), buf (256), buf2 (256);
-    double maxStepNormal = 0, maxStepSwitch = 0, prev = 0;
-    for (size_t i = 0; i < x.size(); i += 256)
+    // treble 5: channel 1 blends both captures; treble 8: both channels are the same capture,
+    // so any step at the switch is a pure artifact
+    for (double treble : { 5.0, 8.0 })
     {
-        if (i == 48000 / 256 * 256) p.channel = 1;            // channel switch at 1 s
-        if (i == 96000 / 256 * 256) chain.publishRuntime (AmpRuntime::build (def, fs, 256, {}, errors)); // amp reload at 2 s
-        const int n = (int) std::min<size_t> (256, x.size() - i);
-        std::copy (x.begin() + (long) i, x.begin() + (long) i + n, buf.begin());
-        double* io[2] = { buf.data(), buf2.data() };
-        chain.setParameters (p);
-        chain.process (io, 1, 2, n);
-        for (int s = 0; s < n; ++s)
+        SignalChain chain;
+        chain.prepare (fs, 256);
+        std::vector<std::string> errors;
+        chain.publishRuntime (AmpRuntime::build (def, fs, 256, {}, errors));
+        EngineParameters p; p.cabOn = false;
+        p.knobs[(size_t) Control::Treble] = treble;
+
+        auto x = tst::sine (110.0, fs, 48000 * 3, 0.3);
+        std::vector<double> buf (256), buf2 (256);
+        double maxStepNormal = 0, stepChan = 0, stepAmp = 0, prev = 0;
+        for (size_t i = 0; i < x.size(); i += 256)
         {
-            const double d = std::abs (buf[(size_t) s] - prev);
-            prev = buf[(size_t) s];
-            const size_t t = i + (size_t) s;
-            if (t > 24000 && t < 47000) maxStepNormal = std::max (maxStepNormal, d);
-            if ((t > 48000 && t < 52000) || (t > 96000 && t < 100000)) maxStepSwitch = std::max (maxStepSwitch, d);
+            if (i == 48000 / 256 * 256) p.channel = 1;            // channel switch at 1 s
+            if (i == 96000 / 256 * 256) chain.publishRuntime (AmpRuntime::build (def, fs, 256, {}, errors)); // amp reload at 2 s
+            const int n = (int) std::min<size_t> (256, x.size() - i);
+            std::copy (x.begin() + (long) i, x.begin() + (long) i + n, buf.begin());
+            double* io[2] = { buf.data(), buf2.data() };
+            chain.setParameters (p);
+            chain.process (io, 1, 2, n);
+            for (int s = 0; s < n; ++s)
+            {
+                const double d = std::abs (buf[(size_t) s] - prev);
+                prev = buf[(size_t) s];
+                const size_t t = i + (size_t) s;
+                // steady state on both sides of the switch (the channels can differ in level at 110 Hz)
+                if ((t > 24000 && t < 47000) || (t > 72000 && t < 95000)) maxStepNormal = std::max (maxStepNormal, d);
+                if (t > 48000 && t < 54000) stepChan = std::max (stepChan, d);
+                if (t > 96000 && t < 102000) stepAmp = std::max (stepAmp, d);
+            }
         }
+        chain.collectGarbage();
+        INFO ("treble %.0f: max sample step steady %.4f, channel switch %.4f, amp reload %.4f", treble, maxStepNormal, stepChan, stepAmp);
+        CHECK (stepChan < 1.5 * maxStepNormal + 1e-3);
+        CHECK (stepAmp < 1.5 * maxStepNormal + 1e-3);
     }
-    chain.collectGarbage();
-    INFO ("max sample step: steady %.4f, around switches %.4f", maxStepNormal, maxStepSwitch);
-    CHECK (maxStepSwitch < 2.0 * maxStepNormal + 1e-3);
 }
 
 TEST (preset_and_cab_preset_round_trip)
@@ -1289,6 +1299,74 @@ TEST (delete_all_captures_and_auto_default)
         if (s.id == pid::gateOn) CHECK (s.def == 1.0);
     }
     CHECK (EngineParameters {}.matrixAuto && EngineParameters {}.gateOn);
+}
+
+TEST (level_match_equalises_captures)
+{
+    const double fs = 48000;
+    // the meter: +6 dB of signal reads +6 dB
+    auto ph = LevelMatch::testPhrase (fs);
+    auto ph2 = ph; for (auto& v : ph2) v *= 2.0;
+    CHECK (std::abs (LevelMatch::loudnessDb (ph2, fs) - LevelMatch::loudnessDb (ph, fs) - 6.02) < 0.01);
+
+    const auto dir = tempDir ("levelmatch");
+    const auto a = makeCapture (dir, "A", "X", "A", "A", "wavenet_a1_standard.nam");
+    const auto b = makeCapture (dir, "B", "Y", "B", "B", "wavenet.nam");
+    AmpLibrary lib (tempDir ("levelmatch_lib"));
+    std::string err;
+    const auto id = lib.createBlend ("AB", { a, b }, err);
+    CHECK (! id.empty());
+    std::vector<std::string> errors;
+    auto rt = AmpRuntime::build (*lib.find (id), fs, 256, {}, errors);
+    CHECK (errors.empty());
+
+    auto play = [&] (int slot, bool match) {
+        rt->setLevelMatch (match);
+        std::array<double, kBlendSlots> lv {}; lv[(size_t) slot] = 1.0;
+        std::vector<double> warm (19200, 0.0), out (ph.size() + 19200), y (ph.size());
+        std::vector<double> in = warm; in.insert (in.end(), ph.begin(), ph.end());
+        for (size_t i = 0; i < in.size(); i += 256)
+        {
+            rt->setKnobs (0, { 5, 5, 5, 5, 5, 5, 5, 5 });
+            rt->setBlendLevels (0, lv);
+            rt->process (0, in.data() + i, out.data() + i, (int) std::min<size_t> (256, in.size() - i));
+        }
+        std::copy (out.begin() + 19200, out.end(), y.begin());
+        return LevelMatch::loudnessDb (y, fs);
+    };
+    const double rawA = play (0, false), rawB = play (1, false);
+    const double mA = play (0, true), mB = play (1, true);
+    INFO ("captures: %.1f vs %.1f dB raw (diff %.1f) -> %.2f vs %.2f dB matched; corrections %+.1f / %+.1f dB",
+          rawA, rawB, rawA - rawB, mA, mB, rt->matchDbForSlot (0, 0), rt->matchDbForSlot (0, 1));
+    CHECK (std::abs (rawA - rawB) > 1.0);                           // they really differ
+    CHECK (std::abs (mA - mB) < 0.5);                               // ...and now sit at one level
+    CHECK (std::abs (mA - LevelMatch::kReferenceDb) < 1.0);
+    CHECK (std::isnan (rt->matchDbForSlot (0, 7)));                 // empty slot
+}
+
+TEST (fine_tune_knobs_trim_each_band)
+{
+    const double fs = 48000;
+    SignalChain chain;
+    chain.prepare (fs, 256);
+    EngineParameters p;
+    p.cabOn = false; p.harmonicsOn = false; p.gateOn = false;
+    auto level = [&] (const EngineParameters& q, double f) {
+        auto y = runChain (chain, q, tst::sine (f, fs, 48000, 0.05));
+        return tst::db (tst::tone (y, 24000, 16384, f, fs));
+    };
+    for (int b = 0; b < 5; ++b)
+    {
+        const double f = ToneMatch::kCentres[b];
+        const double flat = level (p, f);
+        auto q = p; q.toneTrimDb[(size_t) b] = 4.0;
+        const double up = level (q, f);
+        q.toneTrimDb[(size_t) b] = -4.0;
+        const double down = level (q, f);
+        CHECK_MSG (std::abs (up - flat - 4.0) < 0.6 && std::abs (down - flat + 4.0) < 0.6,
+                   "%s: %+.2f / %+.2f dB", pid::toneBandName[b], up - flat, down - flat);
+    }
+    CHECK (chain.toneCorrectionDb[4].load() < -3.9f);               // shown in the APPLIED column
 }
 
 // --------------------------------------------------------------------------------------------

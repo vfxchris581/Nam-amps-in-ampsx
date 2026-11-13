@@ -30,6 +30,10 @@ Controls no capture varies — or knob positions beyond what you captured — ar
 ### Dual IR cabinet
 Two independent slots (WAV/AIFF, mono or stereo, 44.1–192 kHz, any length): volume, pan, polarity, delay, on/off · blend · cab level · mono/stereo · **automatic phase alignment** by cross-correlation · cab presets.
 
+### Level match & fine tune
+- **Level match** (on by default, Tone Matrix and Tube pages): every NAM capture plays a short guitar phrase when it loads and its loudness is measured with BS.1770 K-weighting (how loud it *sounds*). Each capture is then brought to the same reference level, so clean and high-gain captures sit together and blends don't jump in volume. Each loader shows its correction in dB; switching it off glides over 50 ms.
+- **Fine-tune knobs** on the Resonance, Bass, Middle, Treble and Presence rows of the blend matrix: +/-6 dB per band on top of whatever the matrix or the amp knobs do (double-click for 0).
+
 ### Noise gate & tuner
 - **Noise gate** (on by default): listens to the guitar *before* the amp and mutes *after* it, so the amp's amplified hiss goes too while picks are never cut and the cab tail rings out. RMS detector, 6 dB hysteresis, hold, adjustable threshold and release.
 - **Chromatic tuner** from the header: YIN pitch detection on the raw input, accurate to about 0.1 cent across the guitar range (low B to the high frets), cents meter, standard-tuning string chips, adjustable A4 reference, optional output mute.

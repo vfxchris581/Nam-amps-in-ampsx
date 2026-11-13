@@ -31,6 +31,7 @@ void SignalChain::prepare (double sr, int block)
     cabinet.prepare ({ sr, (juce::uint32) maxBlock, 2 });
     ampFadeLen = (int) (0.06 * sr);
     chanFadeLen = (int) (0.035 * sr);
+    chanWarmLen = (int) (0.025 * sr); // the new channel's captures settle before they are heard
     setOversampling (osQuality, osLinearPhase);
 }
 
@@ -113,6 +114,7 @@ void SignalChain::processMono (double* x, int n) noexcept
         if (fadingOut != nullptr) runtimes.retire (fadingOut); // a fade was still running: drop it
         fadingOut = previous;
         ampFade = previous != nullptr ? ampFadeLen : 0;
+        ampWarm = previous != nullptr ? chanWarmLen : 0; // new amp settles silently first
         runtimeLatency = rt != nullptr ? rt->getLatency() : 0;
         updateLatency();
     }
@@ -125,6 +127,7 @@ void SignalChain::processMono (double* x, int n) noexcept
     {
         prevChannel = lastChannel;
         lastChannel = channel;
+        chanWarm = chanWarmLen;
         chanFade = chanFadeLen;
     }
 
@@ -179,8 +182,11 @@ void SignalChain::processMono (double* x, int n) noexcept
     if (rt != nullptr)
     {
         rt->setPhaseMode ((PhaseMode) p.phaseMode);
+        rt->setLevelMatch (p.levelMatch);
+        if (rt->isBlend())
+            for (int s = 0; s < kBlendSlots; ++s) slotMatchDb[(size_t) s] = (float) rt->matchDbForSlot (channel, s);
         res = rt->setKnobs (channel, p.knobs);
-        if (chanFade > 0 && prevChannel >= 0) rt->setKnobs (prevChannel, p.knobs);
+        if ((chanWarm > 0 || chanFade > 0) && prevChannel >= 0) rt->setKnobs (prevChannel, p.knobs);
         if (rt->isBlend())
         {
             // Effective tone matrix: manual knobs, or derived from the amp knobs in Auto mode.
@@ -226,14 +232,16 @@ void SignalChain::processMono (double* x, int n) noexcept
     if (rt != nullptr)
     {
         rt->process (channel, scratch.data(), ampOut.data(), n);
-        if (chanFade > 0 && prevChannel >= 0)
+        if ((chanWarm > 0 || chanFade > 0) && prevChannel >= 0)
         {
             rt->process (prevChannel, scratch.data(), ampTmp.data(), n);
             for (int i = 0; i < n; ++i)
             {
-                const double g = (double) chanFade / chanFadeLen;
+                double g = 1.0; // warm-up: the new channel runs silently, the old one keeps playing
+                if (chanWarm > 0) --chanWarm;
+                else if (chanFade > 0) { g = (double) chanFade / chanFadeLen; --chanFade; }
+                else g = 0.0;
                 ampOut[(size_t) i] = ampOut[(size_t) i] * (1.0 - g) + ampTmp[(size_t) i] * g;
-                if (chanFade > 0) --chanFade;
             }
         }
     }
@@ -247,9 +255,10 @@ void SignalChain::processMono (double* x, int n) noexcept
         fadingOut->process (std::min (channel, fadingOut->numChannels() - 1), scratch.data(), ampTmp.data(), n);
         for (int i = 0; i < n; ++i)
         {
-            const double g = (double) ampFade / ampFadeLen;
+            double g = 1.0;
+            if (ampWarm > 0) --ampWarm;
+            else { g = (double) ampFade / ampFadeLen; if (ampFade > 0) --ampFade; }
             ampOut[(size_t) i] = ampOut[(size_t) i] * (1.0 - g) + ampTmp[(size_t) i] * g;
-            if (ampFade > 0) --ampFade;
         }
         if (ampFade <= 0) { runtimes.retire (fadingOut); fadingOut = nullptr; }
     }
@@ -266,6 +275,7 @@ void SignalChain::processMono (double* x, int n) noexcept
     ToneMatch::Bands corr {};
     if (rt != nullptr && rt->isBlend())
         corr = rt->toneCorrection (channel, effGain, effBands);
+    for (int b = 0; b < 5; ++b) corr[(size_t) b] += p.toneTrimDb[(size_t) b]; // fine-tune knobs
     for (int b = 0; b < 5; ++b) toneCorrectionDb[(size_t) b] = (float) corr[(size_t) b];
     toneMatch.setCorrectionDb (corr);
     toneMatch.process (x, n);

@@ -39,7 +39,10 @@ private:
     std::unique_ptr<Toggle> invert[kSlots];
     Choice phase;
     juce::Label phaseLabel { {}, "Phase" };
-    juce::Label names[kSlots], readout[kRows];
+    juce::Label names[kSlots], matchLabel[kSlots], readout[kRows];
+    Toggle levelMatch;
+    juce::Slider trim[kRows];                                  // fine-tune per tone row (rows 1..5)
+    std::unique_ptr<APVTS::SliderAttachment> trimAttach[kRows];
     Toggle autoToggle;
     juce::TextButton resetAll { "Even blend" };
     juce::TextButton deleteAll { "Delete all" };
@@ -49,6 +52,6 @@ private:
     int numLoaded = 0;
     bool autoMode = true, lastAuto = true;
     juce::Rectangle<int> slotsArea, plate, matrixArea, grid;
-    int labelW = 104, readW = 58;
+    int labelW = 150, readW = 58, nameW = 104;
 };
 } // namespace namknobs

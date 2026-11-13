@@ -112,6 +112,8 @@ void NamKnobsProcessor::init (const juce::File& root)
            raw (pid::ir1Pan), raw (pid::ir1Invert), raw (pid::ir1Delay), raw (pid::ir2On), raw (pid::ir2Level),
            raw (pid::ir2Pan), raw (pid::ir2Invert), raw (pid::ir2Delay), {} };
     rp.matrixAuto = raw (pid::matrixAuto);
+    rp.levelMatch = raw (pid::levelMatch);
+    for (int t = 0; t < 5; ++t) rp.toneTrim[t] = raw (pid::toneTrim[t]);
     rp.gateOn = raw (pid::gateOn); rp.gateThreshold = raw (pid::gateThreshold); rp.gateRelease = raw (pid::gateRelease);
     rp.phaseMode = raw (pid::phaseMode);
     rp.eqOn = raw (pid::eqOn); rp.eqPost = raw (pid::eqPost); rp.eqOut = raw (pid::eqOut);
@@ -174,6 +176,8 @@ void NamKnobsProcessor::snapshotParameters (EngineParameters& p) const noexcept
     p.ir1 = { b (rp.ir1On), f (rp.ir1Level), f (rp.ir1Pan), f (rp.ir1Delay), b (rp.ir1Invert) };
     p.ir2 = { b (rp.ir2On), f (rp.ir2Level), f (rp.ir2Pan), f (rp.ir2Delay), b (rp.ir2Invert) };
     p.matrixAuto = b (rp.matrixAuto);
+    p.levelMatch = b (rp.levelMatch);
+    for (int t = 0; t < 5; ++t) p.toneTrimDb[(size_t) t] = f (rp.toneTrim[t]);
     p.gateOn = b (rp.gateOn); p.gateThresholdDb = f (rp.gateThreshold); p.gateReleaseMs = f (rp.gateRelease);
     p.phaseMode = (int) rp.phaseMode->load();
     p.eq.enabled = b (rp.eqOn);

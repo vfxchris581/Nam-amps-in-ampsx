@@ -52,9 +52,8 @@ void ToneResidual::process (double* x, int n) noexcept
         if (changed) updateCoeffs();
 
         const int end = std::min (n, start + 64);
-        const bool any = sBass.getCurrent() != 0 || sMid.getCurrent() != 0 || sTreble.getCurrent() != 0
-                         || sPres.getCurrent() != 0 || sRes.getCurrent() != 0;
-        if (! any) continue;
+        // Always run the filters (at 0 dB they are exact unity): skipping them while flat would
+        // leave stale state behind, and the first knob move / channel switch would click.
         for (int i = start; i < end; ++i)
         {
             double v = x[i];

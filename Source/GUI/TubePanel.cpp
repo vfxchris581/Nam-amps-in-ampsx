@@ -13,7 +13,8 @@ TubePanel::TubePanel (NamKnobsProcessor& p)
       speaker (p.getAPVTS(), pid::speaker, "Speaker"),
       amount (p.getAPVTS(), pid::harmAmount, "Harmonics"), evenOdd (p.getAPVTS(), pid::harmEvenOdd, "Odd / Even"),
       touch (p.getAPVTS(), pid::harmTouch, "Touch"), attack (p.getAPVTS(), pid::harmAttack, "Pick Attack"),
-      lowDef (p.getAPVTS(), pid::harmLowDef, "Low Def"), highDetail (p.getAPVTS(), pid::harmHighDetail, "High Detail")
+      lowDef (p.getAPVTS(), pid::harmLowDef, "Low Def"), highDetail (p.getAPVTS(), pid::harmHighDetail, "High Detail"),
+      loudness (p.getAPVTS(), pid::levelMatch, "Level match (every capture at the same loudness)")
 {
     for (juce::Component* c : { (juce::Component*) &preOn, (juce::Component*) &paOn, (juce::Component*) &harmOn,
                                 (juce::Component*) &preDrive, (juce::Component*) &preMix, (juce::Component*) &tubeType,
@@ -28,9 +29,6 @@ TubePanel::TubePanel (NamKnobsProcessor& p)
 
     osBox.addItem ("2x", 1); osBox.addItem ("4x", 2); osBox.addItem ("8x", 3);
     for (int i = 1; i <= 6; ++i) maxActiveBox.addItem (juce::String (i), i);
-    loudness.setSliderStyle (juce::Slider::LinearHorizontal);
-    loudness.setRange (0.0, 1.0, 0.01);
-    loudness.setTextBoxStyle (juce::Slider::TextBoxRight, false, 50, 20);
     for (auto* l : { &loudnessLabel, &osLabel, &maxLabel })
     {
         l->setFont (ui::semi (12.0f));
@@ -38,7 +36,6 @@ TubePanel::TubePanel (NamKnobsProcessor& p)
     }
     osBox.onChange = maxActiveBox.onChange = [this] { pushOptions(); };
     linearPhase.onClick = alwaysOn.onClick = [this] { pushOptions(); };
-    loudness.onDragEnd = [this] { pushOptions(); };
     refresh();
 }
 
@@ -49,7 +46,6 @@ void TubePanel::refresh()
     maxActiveBox.setSelectedId (o.maxActive, juce::dontSendNotification);
     linearPhase.setToggleState (o.linearPhase, juce::dontSendNotification);
     alwaysOn.setToggleState (o.alwaysOn, juce::dontSendNotification);
-    loudness.setValue (o.loudnessComp, juce::dontSendNotification);
 }
 
 void TubePanel::pushOptions()
@@ -59,7 +55,6 @@ void TubePanel::pushOptions()
     o.maxActive = std::max (1, maxActiveBox.getSelectedId());
     o.linearPhase = linearPhase.getToggleState();
     o.alwaysOn = alwaysOn.getToggleState();
-    o.loudnessComp = loudness.getValue();
     proc.setEngineOptions (o);
 }
 

@@ -104,6 +104,7 @@ set(NAMKNOBS_CORE_SOURCES
     Source/AudioEngine/EngineParameters.cpp
     Source/AudioEngine/ParametricEQ.cpp
     Source/AudioEngine/NoiseGate.cpp
+    Source/AmplifierEngine/LevelMatch.cpp
     Source/AudioEngine/PitchDetector.cpp
     Source/ProfileInterpolation/PhaseMatcher.cpp
     Source/AudioEngine/SignalChain.cpp)

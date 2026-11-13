@@ -50,6 +50,7 @@ void CaptureBlender::prepare (double sampleRate, int maxBlockSize, std::vector<B
     hold.assign (n, 0);
     totalLatency.assign (n, 0);
     tmp.assign ((size_t) maxBlockSize, 0.0);
+    matchStep = 1.0 / std::max (1.0, 0.05 * sampleRate);
     // One-pole glide shared by every weight: a linear map, so the weights keep summing to one
     // during every transition (no level dips while crossfading).
     rampPerSample = 1.0 - std::exp (-3.0 / std::max (1.0, fadeMs * 0.001 * sampleRate));
@@ -146,6 +147,11 @@ void CaptureBlender::process (const double* in, double* out, int n) noexcept
 {
     std::fill (out, out + n, 0.0);
     running = 0;
+    // level match amount glides 0 <-> 1 over 50 ms
+    const double a0 = matchAmt;
+    const double a1 = a0 + std::clamp (matchTarget - a0, -matchStep * n, matchStep * n);
+    matchAmt = a1;
+    const double aStep = n > 0 ? (a1 - a0) / n : 0.0;
     for (size_t i = 0; i < src.size(); ++i)
     {
         if (target[i] > 0.0 || w[i] > 0.0) hold[i] = holdSamples;
@@ -157,8 +163,8 @@ void CaptureBlender::process (const double* in, double* out, int n) noexcept
 
         src[i].model->process (in, tmp.data(), n);
 
-        const double g = src[i].staticGain;
-        double wi = w[i], si = sign[i];
+        const double g = src[i].staticGain, mg = src[i].matchGain - 1.0;
+        double wi = w[i], si = sign[i], a = a0;
         const double t = target[i], st = signTarget[i];
         for (int s = 0; s < n; ++s)
         {
@@ -166,8 +172,9 @@ void CaptureBlender::process (const double* in, double* out, int n) noexcept
             if (std::abs (t - wi) < 1.0e-6) wi = t;
             si += (st - si) * signRamp; // polarity flips pass smoothly through zero
             if (std::abs (st - si) < 1.0e-6) si = st;
+            a += aStep;
             const double y = align[i].process (tmp[(size_t) s]);
-            out[s] += wi * si * g * y;
+            out[s] += wi * si * g * (1.0 + a * mg) * y;
         }
         w[i] = wi;
         sign[i] = si;

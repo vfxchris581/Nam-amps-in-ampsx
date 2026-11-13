@@ -32,7 +32,8 @@ plug-ins and asks whether to keep your library (amps, blends, captures, presets)
 5. Load one or two cabinet IRs on **Cabinet** (or drop WAV files on the window).
 6. Click **Tuner** at the top to tune up (it mutes the output while open; untick *Mute output while tuning* to hear yourself).
 7. The **Noise Gate** on the Amp page is on by default. Raise *Threshold* until the hiss stops when you mute the strings; lower it if note tails get cut.
-8. To start over, **Delete all** on the Tone Matrix empties the 18 loaders; **Delete all amps & captures...** on Library empties the whole library. Your original .nam files are never touched.
+8. **Level match** (Tone Matrix, top of the loaders) keeps every capture at the same loudness; the small green number on each loader is its correction in dB. The little knobs next to Resonance / Bass / Middle / Treble / Presence in the blend matrix fine-tune each band by up to 6 dB.
+9. To start over, **Delete all** on the Tone Matrix empties the 18 loaders; **Delete all amps & captures...** on Library empties the whole library. Your original .nam files are never touched.
 
 ## Naming captures so Nam Knobs reads every knob
 `<Amp> <channel> G<gain> B<bass> M<mid> T<treble> P<presence> R<resonance> V<volume>/MV<master>`

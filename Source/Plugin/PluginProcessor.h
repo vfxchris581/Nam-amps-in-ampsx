@@ -134,6 +134,8 @@ private:
             *ir1On, *ir1Level, *ir1Pan, *ir1Invert, *ir1Delay, *ir2On, *ir2Level, *ir2Pan, *ir2Invert, *ir2Delay;
         std::atomic<float>* blendMix[kBlendSlots];
         std::atomic<float>* matrixAuto = nullptr;
+        std::atomic<float>* levelMatch = nullptr;
+        std::atomic<float>* toneTrim[5] {};
         std::atomic<float>* gateOn = nullptr, *gateThreshold = nullptr, *gateRelease = nullptr;
         std::atomic<float>* phaseMode = nullptr;
         std::atomic<float>* eqOn = nullptr, *eqPost = nullptr, *eqOut = nullptr;

@@ -3,7 +3,7 @@
 // and mixes their *outputs* with per-sample weight glides. Output-domain blending keeps every
 // capture's own dynamics, sag and pick response intact (dynamic response preservation).
 //
-//  * loudness compensation  - every capture normalised to a common level before mixing
+//  * level match            - every capture brought to the same loudness (switchable live)
 //  * phase handling (3 modes, switchable live, click-free):
 //      Off           - captures summed as they are
 //      Time-aligned  - processing/reamp latency equalised (whole samples)
@@ -23,7 +23,9 @@ namespace namknobs
 struct BlendSource
 {
     NamModel* model = nullptr;
-    double staticGain = 1.0;     // loudness compensation * user trim (* stored polarity)
+    double staticGain = 1.0;     // user trim
+    double matchGain = 1.0;      // level match: brings this capture to the reference loudness
+    double matchDb = 0.0;        // the same, in dB (display)
     int intrinsicLatency = 0;    // capture's own latency in host samples (from analysis)
     double phaseLag = 0.0;       // measured residual lag vs the reference capture (samples, fractional)
     int phasePolarity = 1;       // measured polarity vs the reference capture (probe)
@@ -62,6 +64,8 @@ public:
     void setUserPolarity (int source, int sign) noexcept;
     /** Audio thread: phase mode (delays glide over ~40 ms). */
     void setPhaseMode (PhaseMode m) noexcept;
+    /** Audio thread: level match on/off (glides over 50 ms). */
+    void setLevelMatch (bool on) noexcept { matchTarget = on ? 1.0 : 0.0; }
     /** Jump straight to the targets (used when a runtime is first built). */
     void snapToTargets() noexcept;
     /** Audio thread. */
@@ -85,7 +89,7 @@ private:
     std::vector<int> hold, totalLatency;
     std::vector<FracDelay> align;
     std::vector<double> tmp;
-    double rampPerSample = 0.001, signRamp = 0.001;
+    double rampPerSample = 0.001, signRamp = 0.001, matchAmt = 1.0, matchTarget = 1.0, matchStep = 0.001;
     int holdSamples = 0, reportedLatency = 0, running = 0, maxTotal = 0, headroom = 0;
     PhaseMode mode = PhaseMode::PhaseMatched;
     bool alwaysOn = false;

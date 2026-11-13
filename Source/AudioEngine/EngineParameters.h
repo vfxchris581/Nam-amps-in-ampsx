@@ -46,6 +46,8 @@ struct EngineParameters
 
     bool matrixAuto = true; // blends: amp knobs drive the tone matrix automatically
     int phaseMode = 2;      // 0 off, 1 time-aligned, 2 phase-matched
+    bool levelMatch = true; // every capture brought to the same loudness
+    std::array<double, 5> toneTrimDb {}; // fine-tune per band [resonance, bass, middle, treble, presence]
     std::array<bool, kBlendSlots> slotInvert {}; // blends: user polarity flip per slot
     EqSettings eq;
     std::array<double, kBlendSlots> blendMix { 1, 1, 1, 1, 1, 1, 1, 1 }; // blend amps: gain source = audio mix of the slots
@@ -119,6 +121,8 @@ namespace pid
         { "tonePres1", "tonePres2", "tonePres3", "tonePres4", "tonePres5", "tonePres6", "tonePres7", "tonePres8", "tonePres9", "tonePres10", "tonePres11", "tonePres12", "tonePres13", "tonePres14", "tonePres15", "tonePres16", "tonePres17", "tonePres18" } };
     inline const char* matrixAuto = "matrixAuto";
     inline const char* phaseMode = "phaseMode";
+    inline const char* levelMatch = "levelMatch";
+    inline const char* toneTrim[5] = { "toneTrimRes", "toneTrimBass", "toneTrimMid", "toneTrimTreb", "toneTrimPres" };
     inline const char* eqOn = "eqOn";
     inline const char* eqPost = "eqPostCab";
     inline const char* eqOut = "eqOutput";

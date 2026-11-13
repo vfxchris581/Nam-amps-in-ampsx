@@ -24,8 +24,8 @@ private:
     Knob amount, evenOdd, touch, attack, lowDef, highDetail;
     juce::ComboBox osBox, maxActiveBox;
     juce::ToggleButton linearPhase { "Linear-phase oversampling" }, alwaysOn { "All captures always running (more CPU)" };
-    juce::Slider loudness;
-    juce::Label loudnessLabel { {}, "Capture loudness compensation" }, osLabel { {}, "Oversampling" }, maxLabel { {}, "Max blended captures" };
+    Toggle loudness;
+    juce::Label loudnessLabel { {}, "Capture levels" }, osLabel { {}, "Oversampling" }, maxLabel { {}, "Max blended captures" };
     juce::Rectangle<int> areas[4];
 };
 } // namespace namknobs

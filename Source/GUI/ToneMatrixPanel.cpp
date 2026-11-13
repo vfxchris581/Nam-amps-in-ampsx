@@ -46,7 +46,8 @@ juce::String ToneMatrixPanel::paramId (int row, int slot) const
 }
 
 ToneMatrixPanel::ToneMatrixPanel (NamKnobsProcessor& p)
-    : proc (p), phase (p.getAPVTS(), pid::phaseMode), autoToggle (p.getAPVTS(), pid::matrixAuto, "Auto (knobs blend the captures)")
+    : proc (p), phase (p.getAPVTS(), pid::phaseMode), levelMatch (p.getAPVTS(), pid::levelMatch, "Level match"),
+      autoToggle (p.getAPVTS(), pid::matrixAuto, "Auto (knobs blend the captures)")
 {
     for (int k = 0; k < kNumControls; ++k)
     {
@@ -65,6 +66,18 @@ ToneMatrixPanel::ToneMatrixPanel (NamKnobsProcessor& p)
             c.addMouseListener (mouse[r][s].get(), true);
             addAndMakeVisible (c);
         }
+        if (r > 0)
+        {
+            auto& t = trim[r];
+            t.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
+            t.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
+            t.setRotaryParameters (juce::degreesToRadians (-140.0f), juce::degreesToRadians (140.0f), true);
+            t.setPopupDisplayEnabled (true, true, this);
+            t.setDoubleClickReturnValue (true, 0.0);
+            t.setTooltip ("Fine-tune " + juce::String (rowNames[r]).toLowerCase() + " (+/-6 dB). Double-click for 0.");
+            trimAttach[r] = std::make_unique<APVTS::SliderAttachment> (p.getAPVTS(), pid::toneTrim[r - 1], t);
+            addAndMakeVisible (t);
+        }
         readout[r].setFont (ui::semi (11.5f));
         readout[r].setJustificationType (juce::Justification::centred);
         addAndMakeVisible (readout[r]);
@@ -75,6 +88,11 @@ ToneMatrixPanel::ToneMatrixPanel (NamKnobsProcessor& p)
         names[s].setJustificationType (juce::Justification::centred);
         names[s].setMinimumHorizontalScale (0.7f);
         addAndMakeVisible (names[s]);
+        matchLabel[s].setFont (ui::semi (9.5f));
+        matchLabel[s].setJustificationType (juce::Justification::centredRight);
+        matchLabel[s].setColour (juce::Label::textColourId, ui::green.withAlpha (0.85f));
+        matchLabel[s].setTooltip ("Level match (dB): the gain that brings this capture to the same loudness as the others");
+        addChildComponent (matchLabel[s]);
         load[s].onClick = [this, s] {
             chooser = std::make_unique<juce::FileChooser> ("Load a NAM capture into slot " + juce::String (s + 1), juce::File(), "*.nam;*.NAM");
             chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
@@ -111,6 +129,9 @@ ToneMatrixPanel::ToneMatrixPanel (NamKnobsProcessor& p)
             juce::ModalCallbackFunction::create ([this] (int r) { if (r) proc.clearAllBlendSlots(); }));
     };
     addAndMakeVisible (deleteAll);
+    levelMatch.setTooltip ("Plays every capture at the same loudness (measured the way your ear hears it), "
+                           "so clean and high-gain captures sit at one level and blends don't jump in volume.");
+    addAndMakeVisible (levelMatch);
     addAndMakeVisible (resetAll);
     refresh();
     startTimerHz (15);
@@ -206,9 +227,19 @@ void ToneMatrixPanel::timerCallback()
         for (int r = 0; r < kRows; ++r)
             for (int s = 0; s < kSlots; ++s)
                 if (loaded[s]) { cells[r][s]->setValue (ch.matrixWeights[(size_t) r][(size_t) s].load(), juce::dontSendNotification); cells[r][s]->repaint(); }
+    const bool lm = proc.getAPVTS().getRawParameterValue (pid::levelMatch)->load() > 0.5f;
+    for (int s = 0; s < kSlots; ++s)
+    {
+        const float v = ch.slotMatchDb[(size_t) s].load();
+        const bool show = loaded[s] && std::isfinite (v);
+        const auto txt = show ? (v >= 0.0f ? "+" : "") + juce::String (v, 1) : juce::String();
+        if (matchLabel[s].getText() != txt) matchLabel[s].setText (txt, juce::dontSendNotification);
+        matchLabel[s].setVisible (show);
+        matchLabel[s].setAlpha (lm ? 1.0f : 0.35f);
+    }
     for (int r = 1; r < kRows; ++r)
     {
-        const float db = numLoaded > 0 ? ch.toneCorrectionDb[(size_t) (r - 1)].load() : 0.0f;
+        const float db = ch.toneCorrectionDb[(size_t) (r - 1)].load();
         const auto txt = std::abs (db) < 0.05f ? juce::String ("0.0 dB") : (db > 0 ? "+" : "") + juce::String (db, 1) + " dB";
         readout[r].setColour (juce::Label::textColourId, std::abs (db) < 0.05f ? ui::textDim : ui::amber);
         if (readout[r].getText() != txt) readout[r].setText (txt, juce::dontSendNotification);
@@ -234,7 +265,7 @@ void ToneMatrixPanel::paint (juce::Graphics& g)
     const int rowH = grid.getHeight() / kRows;
     for (int r = 0; r < kRows; ++r)
     {
-        auto lr = juce::Rectangle<int> (grid.getX(), grid.getY() + r * rowH, labelW, rowH);
+        auto lr = juce::Rectangle<int> (grid.getX(), grid.getY() + r * rowH, nameW, rowH);
         g.setColour (r == 0 ? ui::gold : ui::text);
         g.setFont (ui::semi (12.5f));
         g.drawText (juce::String (rowNames[r]).toUpperCase(), lr, juce::Justification::centredLeft);
@@ -258,6 +289,8 @@ void ToneMatrixPanel::resized()
         phaseLabel.setBounds (head.removeFromRight (60));
         head.removeFromRight (16);
         deleteAll.setBounds (head.removeFromRight (92));
+        head.removeFromRight (16);
+        levelMatch.setBounds (head.removeFromRight (124));
         a.removeFromTop (2);
         const int perRow = (kSlots + 1) / 2;
         const int w = a.getWidth() / perRow, h = a.getHeight() / 2;
@@ -265,7 +298,9 @@ void ToneMatrixPanel::resized()
         {
             const int row = s / perRow, colIdx = s % perRow;
             auto col = juce::Rectangle<int> (a.getX() + colIdx * w, a.getY() + row * h, w, h).reduced (3, 2);
-            names[s].setBounds (col.removeFromTop (18));
+            auto nameRow = col.removeFromTop (18);
+            matchLabel[s].setBounds (nameRow.removeFromRight (36));
+            names[s].setBounds (nameRow);
             auto b = col.removeFromTop (24);
             clear[s].setBounds (b.removeFromRight (22));
             b.removeFromRight (2);
@@ -297,6 +332,9 @@ void ToneMatrixPanel::resized()
                 cells[row][s]->setBounds (juce::Rectangle<int> (grid.getX() + labelW + s * colW, grid.getY() + row * rowH, colW, rowH)
                                              .reduced (4, 3));
             readout[row].setBounds (grid.getRight() - readW, grid.getY() + row * rowH, readW, rowH);
+            if (row > 0)
+                trim[row].setBounds (juce::Rectangle<int> (grid.getX() + nameW, grid.getY() + row * rowH, labelW - nameW - 6, rowH)
+                                         .withSizeKeepingCentre (std::min (34, rowH), std::min (34, rowH)));
         }
     }
 }
