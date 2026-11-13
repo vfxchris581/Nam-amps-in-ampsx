@@ -21,7 +21,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout createLayout()
                 auto attrs = juce::AudioParameterFloatAttributes().withLabel (s.unit)
                     .withStringFromValueFunction ([unit = s.unit, mx = s.max] (float v, int) {
                         if (unit == "dB") return juce::String (v, 1) + " dB";
-                        if (unit == "ms") return juce::String (v, 2) + " ms";
+                        if (unit == "ms") return juce::String (v, v < 10.0f ? 2 : 0) + " ms";
                         if (unit == "Hz") return v >= 1000.0f ? juce::String (v / 1000.0f, v >= 10000.0f ? 1 : 2) + " kHz"
                                                               : juce::String (juce::roundToInt (v)) + " Hz";
                         if (unit == "Q") return juce::String (v, 2);
@@ -112,6 +112,7 @@ void NamKnobsProcessor::init (const juce::File& root)
            raw (pid::ir1Pan), raw (pid::ir1Invert), raw (pid::ir1Delay), raw (pid::ir2On), raw (pid::ir2Level),
            raw (pid::ir2Pan), raw (pid::ir2Invert), raw (pid::ir2Delay), {} };
     rp.matrixAuto = raw (pid::matrixAuto);
+    rp.gateOn = raw (pid::gateOn); rp.gateThreshold = raw (pid::gateThreshold); rp.gateRelease = raw (pid::gateRelease);
     rp.phaseMode = raw (pid::phaseMode);
     rp.eqOn = raw (pid::eqOn); rp.eqPost = raw (pid::eqPost); rp.eqOut = raw (pid::eqOut);
     for (int bd = 0; bd < 7; ++bd)
@@ -173,6 +174,7 @@ void NamKnobsProcessor::snapshotParameters (EngineParameters& p) const noexcept
     p.ir1 = { b (rp.ir1On), f (rp.ir1Level), f (rp.ir1Pan), f (rp.ir1Delay), b (rp.ir1Invert) };
     p.ir2 = { b (rp.ir2On), f (rp.ir2Level), f (rp.ir2Pan), f (rp.ir2Delay), b (rp.ir2Invert) };
     p.matrixAuto = b (rp.matrixAuto);
+    p.gateOn = b (rp.gateOn); p.gateThresholdDb = f (rp.gateThreshold); p.gateReleaseMs = f (rp.gateRelease);
     p.phaseMode = (int) rp.phaseMode->load();
     p.eq.enabled = b (rp.eqOn);
     p.eq.postCab = rp.eqPost->load() > 0.5f;
@@ -360,8 +362,9 @@ void NamKnobsProcessor::createBlend (const juce::String& name, const juce::Strin
             for (int b = 0; b < 5; ++b)
                 for (int m = 0; m < kBlendSlots; ++m)
                     if (auto* prm = apvts.getParameter (pid::toneSource[b][m])) prm->setValueNotifyingHost (1.0f);
+            if (auto* prm = apvts.getParameter (pid::matrixAuto)) prm->setValueNotifyingHost (1.0f); // knobs blend the captures
             loadAmp (id);
-            setStatus ("Blend \"" + juce::String (blendName) + "\" created - set the mix on the Amp page");
+            setStatus ("Blend \"" + juce::String (blendName) + "\" created - the amp knobs blend the models");
         });
     });
 }
@@ -389,6 +392,8 @@ void NamKnobsProcessor::loadBlendSlot (int slot, const juce::File& namFile)
                     for (int b = 0; b < 5; ++b)
                         if (auto* prm = apvts.getParameter (pid::toneSource[b][m])) prm->setValueNotifyingHost (1.0f);
                 }
+            if (ampId.empty())
+                if (auto* prm = apvts.getParameter (pid::matrixAuto)) prm->setValueNotifyingHost (1.0f); // knobs blend the captures
             loadAmp (id);
             setStatus ("Slot " + juce::String (slot + 1) + " loaded");
         });
@@ -400,6 +405,29 @@ void NamKnobsProcessor::clearBlendSlot (int slot)
     const auto* amp = getCurrentAmp();
     if (amp == nullptr || ! amp->isBlend) return;
     if (library->clearBlendSlot (amp->id, slot)) { rebuildRuntime(); sendChangeMessage(); }
+}
+
+void NamKnobsProcessor::clearAllBlendSlots()
+{
+    const auto* amp = getCurrentAmp();
+    if (amp == nullptr || ! amp->isBlend) return;
+    if (library->clearAllBlendSlots (amp->id))
+    {
+        rebuildRuntime();
+        setStatus ("All loaders emptied");
+        sendChangeMessage();
+    }
+}
+
+void NamKnobsProcessor::deleteAllAmps()
+{
+    std::vector<std::string> ids;
+    for (auto& a : library->getAmps()) ids.push_back (a.id);
+    for (auto& id : ids) library->remove (id);
+    currentAmpId = {};
+    chain.publishRuntime (nullptr);
+    setStatus ("Library cleared - drop NAM captures to build a new amp");
+    sendChangeMessage();
 }
 
 void NamKnobsProcessor::reanalyseCurrentAmp()

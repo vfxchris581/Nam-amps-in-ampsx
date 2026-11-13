@@ -30,6 +30,10 @@ Controls no capture varies — or knob positions beyond what you captured — ar
 ### Dual IR cabinet
 Two independent slots (WAV/AIFF, mono or stereo, 44.1–192 kHz, any length): volume, pan, polarity, delay, on/off · blend · cab level · mono/stereo · **automatic phase alignment** by cross-correlation · cab presets.
 
+### Noise gate & tuner
+- **Noise gate** (on by default): listens to the guitar *before* the amp and mutes *after* it, so the amp's amplified hiss goes too while picks are never cut and the cab tail rings out. RMS detector, 6 dB hysteresis, hold, adjustable threshold and release.
+- **Chromatic tuner** from the header: YIN pitch detection on the raw input, accurate to about 0.1 cent across the guitar range (low B to the high frets), cents meter, standard-tuning string chips, adjustable A4 reference, optional output mute.
+
 ### Engine
 64-bit processing to the cabinet · sinc resampling (>100 dB stopband) when the host rate differs from the capture's training rate · denormal protection · smoothed automation · click-free channel, amp and preset changes · fixed, reported latency · up to 192 kHz.
 
@@ -38,6 +42,8 @@ Two independent slots (WAV/AIFF, mono or stereo, 44.1–192 kHz, any length): vo
 | Captures (profile manager) | Cabinet |
 |---|---|
 | ![](Documentation/images/namknobs-captures.png) | ![](Documentation/images/namknobs-cabinet.png) |
+| **Tuner** | **Tone Matrix** |
+| ![](Documentation/images/namknobs-tuner.png) | ![](Documentation/images/namknobs-tone-matrix.png) |
 | **Tube & Harmonics** | **Library & presets** |
 | ![](Documentation/images/namknobs-tube-harmonics.png) | ![](Documentation/images/namknobs-library.png) |
 

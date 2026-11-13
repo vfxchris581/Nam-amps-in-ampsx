@@ -4,6 +4,7 @@
 
 #include <filesystem>
 #include <set>
+#include <random>
 #include <fstream>
 #include <thread>
 #include <json.hpp>
@@ -27,6 +28,8 @@
 #include "HarmonicEngine/HarmonicEngine.h"
 #include "Convolution/DualCabinet.h"
 #include "AudioEngine/SignalChain.h"
+#include "AudioEngine/NoiseGate.h"
+#include "AudioEngine/PitchDetector.h"
 
 namespace fs = std::filesystem;
 using namespace namknobs;
@@ -1120,6 +1123,172 @@ TEST (preset_and_cab_preset_round_trip)
     PresetManager::CabPreset d;
     CHECK (pm.loadCabPreset (pm.listCabPresets()[0], d));
     CHECK (d.ir2Path == "/b.wav" && std::abs ((double) d.values["cabBlend"] - 0.3) < 1e-9);
+}
+
+TEST (noise_gate_silences_hiss_and_keeps_notes)
+{
+    const double fs = 48000;
+    std::mt19937 rng (7);
+    std::normal_distribution<double> nd (0.0, 1.0);
+    auto hiss = [&] (size_t n, double db) { std::vector<double> v (n); for (auto& s : v) s = nd (rng) * dbToGain (db); return v; };
+
+    NoiseGate g;
+    g.prepare (fs);
+    g.setParams (true, -66.0, 120.0);
+    // 0.5 s hiss at -80 dB RMS, then a note at -20 dB that rings down over 3 s, then hiss again
+    std::vector<double> key = hiss ((size_t) fs / 2, -80.0);
+    const size_t noteAt = key.size();
+    for (size_t i = 0; i < (size_t) (3 * fs); ++i)
+    {
+        const double t = i / fs;
+        key.push_back (0.1 * std::exp (-t * 2.3) * std::sin (2 * 3.14159265358979323846 * 110 * t) + nd (rng) * dbToGain (-80.0));
+    }
+    std::vector<double> gain (key.size());
+    g.computeGain (key.data(), gain.data(), (int) key.size());
+
+    CHECK (gain[noteAt - 1] < 0.001);                                   // hiss alone: closed (> 60 dB down)
+    CHECK (gain[noteAt + (size_t) (0.002 * fs)] > 0.99);                // opens within 2 ms of the pick
+    // stays open until the note falls below the close threshold (-66 - 6 dB, reached after ~2.6 s)
+    size_t closeAt = noteAt;
+    for (size_t i = noteAt + (size_t) (0.01 * fs); i < gain.size(); ++i) if (gain[i] < 0.5) { closeAt = i; break; }
+    const double heldFor = (closeAt - noteAt) / fs;
+    INFO ("note held open for %.2f s, then the gate closed", heldFor);
+    CHECK (heldFor > 2.4 && heldFor < 2.8);
+    CHECK (gain.back() < 0.001);
+    // no chatter: once closed it stays closed in the hiss
+    bool reopened = false;
+    for (size_t i = closeAt + (size_t) (0.2 * fs); i < gain.size(); ++i) if (gain[i] > 0.5) reopened = true;
+    CHECK (! reopened);
+
+    // off = unity
+    NoiseGate off; off.prepare (fs); off.setParams (false, -66.0, 120.0);
+    std::vector<double> g2 (key.size());
+    off.computeGain (key.data(), g2.data(), (int) key.size());
+    CHECK (*std::min_element (g2.begin(), g2.end()) == 1.0);
+
+    // in the full chain: hiss between notes is removed, the note itself is untouched
+    SignalChain chain;
+    chain.prepare (fs, 256);
+    EngineParameters p;
+    p.cabOn = false; p.harmonicsOn = false;
+    auto noiseIn = hiss ((size_t) fs, -78.0);
+    p.gateOn = false;
+    const double hissOff = tst::rms (runChain (chain, p, noiseIn), 24000);
+    p.gateOn = true;
+    const double hissOn = tst::rms (runChain (chain, p, noiseIn), 24000);
+    auto note = tst::sine (220.0, fs, (size_t) fs, 0.1);
+    p.gateOn = false;
+    const double noteOff = tst::rms (runChain (chain, p, note), 24000);
+    p.gateOn = true;
+    const double noteOn = tst::rms (runChain (chain, p, note), 24000);
+    INFO ("chain: hiss %+.1f dB with the gate, note %+.2f dB", tst::db (hissOn / hissOff), tst::db (noteOn / noteOff));
+    CHECK (tst::db (hissOn / hissOff) < -50.0);
+    CHECK (std::abs (tst::db (noteOn / noteOff)) < 0.1);
+}
+
+TEST (tuner_detects_guitar_strings_to_a_cent)
+{
+    auto pluck = [] (double hz, double sr, int n, double fundamental = 0.4) {
+        std::vector<float> x ((size_t) n);
+        for (int i = 0; i < n; ++i)
+        {
+            const double w = 2 * 3.14159265358979323846 * hz * i / sr;
+            x[(size_t) i] = (float) (fundamental * std::sin (w) + 0.5 * std::sin (2 * w + 0.3) + 0.3 * std::sin (3 * w + 1.0)
+                                     + 0.15 * std::sin (4 * w + 2.0) + 0.1 * std::sin (5 * w));
+        }
+        return x;
+    };
+    double worst = 0.0;
+    for (double sr : { 44100.0, 48000.0, 96000.0 })
+    {
+        const int n = PitchDetector::samplesNeeded (sr);
+        for (double hz : { 61.74, 73.42, 82.41, 110.0, 146.83, 196.0, 246.94, 329.63, 659.26, 987.77 })
+            for (double off : { -23.0, 0.0, 11.0 })
+            {
+                const double f = hz * std::pow (2.0, off / 1200.0);
+                const auto r = PitchDetector::detect (pluck (f, sr, n).data(), n, sr);
+                const double err = r.hz > 0 ? 1200.0 * std::log2 (r.hz / f) : 999.0;
+                worst = std::max (worst, std::abs (err));
+                CHECK_MSG (std::abs (err) < 1.0, "%.0f Hz sr %.0f: %.2f cents off (got %.3f Hz)", f, sr, err, r.hz);
+            }
+    }
+    INFO ("worst error across the guitar range: %.3f cents", worst);
+
+    // weak fundamental (bridge pickup on the low E) must not jump an octave
+    const auto weak = pluck (82.41, 48000, 4096, 0.08);
+    const auto r = PitchDetector::detect (weak.data(), 4096, 48000);
+    CHECK_MSG (std::abs (1200.0 * std::log2 (r.hz / 82.41)) < 2.0, "weak fundamental read as %.2f Hz", r.hz);
+
+    // silence and noise read as "no note"
+    std::vector<float> quiet (4096, 0.0f);
+    CHECK (PitchDetector::detect (quiet.data(), 4096, 48000).hz == 0.0);
+    std::mt19937 rng (3);
+    std::uniform_real_distribution<float> u (-0.3f, 0.3f);
+    std::vector<float> noise (4096);
+    for (auto& s : noise) s = u (rng);
+    CHECK (PitchDetector::detect (noise.data(), 4096, 48000).hz == 0.0);
+
+    const auto e2 = PitchDetector::noteFor (82.41);
+    CHECK (e2.name == "E" && e2.octave == 2 && std::abs (e2.cents) < 0.5);
+    const auto a = PitchDetector::noteFor (440.0 * std::pow (2.0, 7.0 / 1200.0));
+    CHECK (a.name == "A" && a.octave == 4 && std::abs (a.cents - 7.0) < 0.01);
+    CHECK (PitchDetector::noteFor (432.0, 432.0).cents == 0.0);
+}
+
+TEST (tuner_mute_and_feed)
+{
+    SignalChain chain;
+    chain.prepare (48000, 256);
+    EngineParameters p;
+    p.cabOn = false; p.harmonicsOn = false; p.gateOn = false;
+    auto x = tst::sine (110.0, 48000, 24000, 0.2);
+    std::vector<float> tmp (32768);
+    runChain (chain, p, x);
+    CHECK (chain.readTunerSamples (tmp.data(), 32768) == 0); // nothing collected while the tuner is closed
+    chain.tunerActive = true;
+    chain.tunerMute = true;
+    const auto y = runChain (chain, p, x);
+    CHECK (chain.readTunerSamples (tmp.data(), 32768) == 24000);
+    CHECK (std::abs (tmp[1000] - (float) x[1000]) < 1e-6f);        // raw guitar, before any gain
+    CHECK (tst::rms (y, 2400) < 1e-6);                              // muted after a 10 ms fade
+    chain.tunerActive = false;
+    CHECK (tst::rms (runChain (chain, p, x), 2400) > 0.001);       // and back
+}
+
+TEST (delete_all_captures_and_auto_default)
+{
+    const auto dir = tempDir ("delall");
+    const auto a = makeCapture (dir, "Plexi Crunch", "Marshall", "1959 SLP", "Plexi Crunch", "wavenet_a1_standard.nam");
+    const auto b = makeCapture (dir, "Recto Modern", "Mesa/Boogie", "Dual Rectifier", "Recto Modern", "wavenet.nam");
+    AmpLibrary lib (tempDir ("delall_lib"));
+    std::string err;
+    const auto id = lib.createBlend ("Two", { a, b }, err);
+    CHECK (! id.empty() && lib.find (id)->totalCaptures() == 2);
+    CHECK (fs::exists (lib.getRoot() / "Captures" / id));
+    CHECK (lib.clearAllBlendSlots (id));
+    CHECK (lib.find (id)->totalCaptures() == 0);
+    CHECK (! fs::exists (lib.getRoot() / "Captures" / id));
+    CHECK (fs::exists (a) && fs::exists (b));                      // originals untouched
+    AmpLibrary reloaded (lib.getRoot());
+    CHECK (reloaded.find (id) != nullptr && reloaded.find (id)->totalCaptures() == 0);
+
+    // an emptied blend still plays (silence, no crash), and refills
+    std::vector<std::string> errors;
+    SignalChain chain;
+    chain.prepare (48000, 256);
+    chain.publishRuntime (AmpRuntime::build (*lib.find (id), 48000, 256, {}, errors));
+    EngineParameters p;
+    CHECK (tst::allFinite (runChain (chain, p, tst::sine (110.0, 48000, 4800, 0.2))));
+    CHECK (! lib.setBlendSlot (id, 3, a, "x", err).empty());
+    CHECK (lib.find (id)->totalCaptures() == 1);
+
+    // defaults: the amp knobs blend the captures, the gate is on
+    for (auto& s : parameterSpecs())
+    {
+        if (s.id == pid::matrixAuto) CHECK (s.def == 1.0);
+        if (s.id == pid::gateOn) CHECK (s.def == 1.0);
+    }
+    CHECK (EngineParameters {}.matrixAuto && EngineParameters {}.gateOn);
 }
 
 // --------------------------------------------------------------------------------------------

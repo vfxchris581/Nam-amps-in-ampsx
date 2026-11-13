@@ -103,6 +103,8 @@ set(NAMKNOBS_CORE_SOURCES
     Source/PresetManager/PresetManager.cpp
     Source/AudioEngine/EngineParameters.cpp
     Source/AudioEngine/ParametricEQ.cpp
+    Source/AudioEngine/NoiseGate.cpp
+    Source/AudioEngine/PitchDetector.cpp
     Source/ProfileInterpolation/PhaseMatcher.cpp
     Source/AudioEngine/SignalChain.cpp)
 

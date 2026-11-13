@@ -64,6 +64,8 @@ public:
     std::string setBlendSlot (const std::string& ampId, int slot, const std::filesystem::path& file,
                               const std::string& newBlendName, std::string& error);
     bool clearBlendSlot (const std::string& ampId, int slot);
+    /** Empties every loader of a blend and deletes its library copies of the captures. */
+    bool clearAllBlendSlots (const std::string& ampId);
 
     bool save (AmpDefinition amp);       // insert or replace by id
     bool remove (const std::string& id); // deletes definition and library capture copies

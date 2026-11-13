@@ -276,6 +276,21 @@ bool AmpLibrary::clearBlendSlot (const std::string& ampId, int slot)
     return false;
 }
 
+bool AmpLibrary::clearAllBlendSlots (const std::string& ampId)
+{
+    for (auto& a : amps)
+        if (a.id == ampId && a.isBlend && ! a.channels.empty())
+        {
+            bool any = false;
+            for (auto& ch : a.channels) { any = any || ! ch.captures.empty(); ch.captures.clear(); }
+            writeAmp (a);
+            std::error_code ec;
+            fs::remove_all (root / "Captures" / ampId, ec); // only the library copies, never the user's originals
+            return any;
+        }
+    return false;
+}
+
 std::string AmpLibrary::assignPending (const PendingCapture& p, const std::string& make, const std::string& model,
                                        const std::string& channel)
 {

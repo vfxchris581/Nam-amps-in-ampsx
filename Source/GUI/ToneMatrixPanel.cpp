@@ -101,6 +101,16 @@ ToneMatrixPanel::ToneMatrixPanel (NamKnobsProcessor& p)
     phaseLabel.setJustificationType (juce::Justification::centredRight);
     addAndMakeVisible (phaseLabel);
     resetAll.onClick = [this] { for (int r = 0; r < kRows; ++r) setRow (r, -1); };
+    deleteAll.setTooltip ("Remove every NAM capture from the loaders");
+    deleteAll.setColour (juce::TextButton::textColourOffId, ui::red.brighter (0.4f));
+    deleteAll.onClick = [this] {
+        if (numLoaded == 0) return;
+        juce::AlertWindow::showOkCancelBox (juce::MessageBoxIconType::WarningIcon, "Delete all captures",
+            "Remove all " + juce::String (numLoaded) + " NAM captures from the loaders?\n\nYour original .nam files are not touched.",
+            "Delete all", "Cancel", this,
+            juce::ModalCallbackFunction::create ([this] (int r) { if (r) proc.clearAllBlendSlots(); }));
+    };
+    addAndMakeVisible (deleteAll);
     addAndMakeVisible (resetAll);
     refresh();
     startTimerHz (15);
@@ -165,6 +175,7 @@ void ToneMatrixPanel::refresh()
         invert[s]->setVisible (loaded[s]);
         for (int r = 0; r < kRows; ++r) cells[r][s]->setAlpha (loaded[s] ? 1.0f : 0.2f);
     }
+    deleteAll.setEnabled (numLoaded > 0);
     applyAutoState();
     resized();
     repaint();
@@ -245,6 +256,8 @@ void ToneMatrixPanel::resized()
         auto head = a.removeFromTop (22);
         phase.setBounds (head.removeFromRight (150).reduced (0, 0));
         phaseLabel.setBounds (head.removeFromRight (60));
+        head.removeFromRight (16);
+        deleteAll.setBounds (head.removeFromRight (92));
         a.removeFromTop (2);
         const int perRow = (kSlots + 1) / 2;
         const int w = a.getWidth() / perRow, h = a.getHeight() / 2;

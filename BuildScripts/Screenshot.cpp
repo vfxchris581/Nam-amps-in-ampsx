@@ -176,6 +176,25 @@ public:
         juce::PNGImageFormat png;
         if (auto os = f.createOutputStream()) png.writeImageToStream (img, *os);
         std::printf ("wrote %s\n", f.getFullPathName().toRawUTF8());
+
+        // tuner: a low E string played 6 cents flat
+        editor->showTuner (true);
+        {
+            const double sr = 48000.0, hz = 82.4069 * std::pow (2.0, -6.0 / 1200.0);
+            std::vector<float> x (8192);
+            for (size_t i = 0; i < x.size(); ++i)
+            {
+                const double t = (double) i / sr, w = 2 * 3.14159265358979323846 * hz * t;
+                x[i] = (float) (0.2 * std::sin (w) + 0.25 * std::sin (2 * w + 0.4) + 0.12 * std::sin (3 * w + 1.1) + 0.06 * std::sin (4 * w));
+            }
+            editor->getTuner().analyse (x.data(), (int) x.size(), sr);
+        }
+        auto timg = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.5f);
+        auto tf = outDir.getChildFile ("namknobs-tuner.png");
+        tf.deleteFile();
+        if (auto os = tf.createOutputStream()) png.writeImageToStream (timg, *os);
+        std::printf ("wrote %s\n", tf.getFullPathName().toRawUTF8());
+        editor->showTuner (false);
     }
 
     void playAudio()

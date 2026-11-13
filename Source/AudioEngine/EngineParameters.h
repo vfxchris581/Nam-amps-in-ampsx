@@ -27,6 +27,9 @@ struct EngineParameters
     int channel = 0;
     double inputDb = 0.0, outputDb = 0.0;
 
+    bool gateOn = true;
+    double gateThresholdDb = -66.0, gateReleaseMs = 120.0;
+
     bool preTubeOn = false;
     double preTubeDrive = 0.3, preTubeMix = 1.0;
 
@@ -70,6 +73,9 @@ namespace pid
     inline const char* channel = "channel";
     inline const char* input = "inputDb";
     inline const char* output = "outputDb";
+    inline const char* gateOn = "gateOn";
+    inline const char* gateThreshold = "gateThreshold";
+    inline const char* gateRelease = "gateRelease";
     inline const char* preTubeOn = "preTubeOn";
     inline const char* preTubeDrive = "preTubeDrive";
     inline const char* preTubeMix = "preTubeMix";

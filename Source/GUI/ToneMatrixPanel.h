@@ -42,6 +42,7 @@ private:
     juce::Label names[kSlots], readout[kRows];
     Toggle autoToggle;
     juce::TextButton resetAll { "Even blend" };
+    juce::TextButton deleteAll { "Delete all" };
     std::unique_ptr<juce::FileChooser> chooser;
 
     bool loaded[kSlots] {};

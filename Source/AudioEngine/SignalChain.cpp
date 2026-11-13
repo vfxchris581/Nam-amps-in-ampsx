@@ -15,6 +15,8 @@ void SignalChain::prepare (double sr, int block)
     ampOut.assign ((size_t) maxBlock, 0.0);
     ampTmp.assign ((size_t) maxBlock, 0.0);
     scratch.assign ((size_t) maxBlock, 0.0);
+    gateBuf.assign ((size_t) maxBlock, 1.0);
+    gate.prepare (sr);
     monoF.assign ((size_t) maxBlock, 0.0f);
     stereo.setSize (2, maxBlock);
 
@@ -126,6 +128,16 @@ void SignalChain::processMono (double* x, int n) noexcept
         chanFade = chanFadeLen;
     }
 
+    // ---- tuner feed (raw guitar, before any gain) ---------------------------------------------
+    if (tunerActive.load (std::memory_order_relaxed))
+    {
+        int s1, n1, s2, n2;
+        tunerFifo.prepareToWrite (n, s1, n1, s2, n2);
+        for (int i = 0; i < n1; ++i) tunerBuf[(size_t) (s1 + i)] = (float) x[i];
+        for (int i = 0; i < n2; ++i) tunerBuf[(size_t) (s2 + i)] = (float) x[n1 + i];
+        tunerFifo.finishedWrite (n1 + n2);
+    }
+
     // ---- input + metering --------------------------------------------------------------------
     inGain.setTarget (dbToGain (p.inputDb));
     float pk = 0.0f;
@@ -135,6 +147,11 @@ void SignalChain::processMono (double* x, int n) noexcept
         pk = std::max (pk, (float) std::abs (x[i]));
     }
     inputPeak = std::max (pk, inputPeak.load() * 0.9f);
+
+    // ---- noise gate detector: listens to the guitar before the amp -----------------------------
+    gate.setParams (p.gateOn, p.gateThresholdDb, p.gateReleaseMs);
+    gate.computeGain (x, gateBuf.data(), n);
+    gateGain = (float) gate.currentGain();
 
     // ---- 12AX7 pre stage (oversampled; always runs for constant latency) ---------------------
     {
@@ -289,6 +306,9 @@ void SignalChain::processMono (double* x, int n) noexcept
         for (int i = 0; i < n; ++i) x[i] *= masterGain.next();
     }
 
+    // ---- noise gate gain: after the amp, so its amplified hiss goes too; the cab tail rings out
+    for (int i = 0; i < n; ++i) x[i] *= gateBuf[(size_t) i];
+
     // ---- studio EQ (before the cabinet) -------------------------------------------------------
     eq.setSettings (p.eq);
     if (! p.eq.postCab) eq.process (x, n);
@@ -313,13 +333,16 @@ void SignalChain::processMono (double* x, int n) noexcept
     if (dipRequested.exchange (false)) { dipPhase = 1; dipCounter = 0; }
     outGain.setTarget (dbToGain (p.outputDb));
     const int dipLen = (int) (0.012 * sampleRate);
+    const double muteTarget = (tunerActive.load (std::memory_order_relaxed) && tunerMute.load (std::memory_order_relaxed)) ? 0.0 : 1.0;
+    const double muteStep = 1.0 / (0.010 * sampleRate);
     float opk = 0.0f;
     for (int i = 0; i < n; ++i)
     {
         if (dipPhase == 1) { dipEnv = std::max (0.0, dipEnv - 1.0 / dipLen); if (dipEnv <= 0.0) { dipPhase = 2; dipCounter = dipLen; } }
         else if (dipPhase == 2) { if (--dipCounter <= 0) dipPhase = 3; }
         else if (dipPhase == 3) { dipEnv = std::min (1.0, dipEnv + 1.0 / dipLen); if (dipEnv >= 1.0) dipPhase = 0; }
-        const float gg = (float) (outGain.next() * dipEnv);
+        muteEnv = muteTarget > muteEnv ? std::min (muteTarget, muteEnv + muteStep) : std::max (muteTarget, muteEnv - muteStep);
+        const float gg = (float) (outGain.next() * dipEnv * muteEnv);
         const float l = stereo.getSample (0, i) * gg, r = stereo.getSample (1, i) * gg;
         stereo.setSample (0, i, std::isfinite (l) ? l : 0.0f);
         stereo.setSample (1, i, std::isfinite (r) ? r : 0.0f);
@@ -333,6 +356,16 @@ void SignalChain::processMono (double* x, int n) noexcept
     for (int i = 0; i < n1; ++i) spectrumBuf[(size_t) (s1 + i)] = 0.5f * (stereo.getSample (0, i) + stereo.getSample (1, i));
     for (int i = 0; i < n2; ++i) spectrumBuf[(size_t) (s2 + i)] = 0.5f * (stereo.getSample (0, n1 + i) + stereo.getSample (1, n1 + i));
     spectrumFifo.finishedWrite (n1 + n2);
+}
+
+int SignalChain::readTunerSamples (float* dest, int maxSamples) noexcept
+{
+    int s1, n1, s2, n2;
+    tunerFifo.prepareToRead (std::min (maxSamples, tunerFifo.getNumReady()), s1, n1, s2, n2);
+    std::copy (tunerBuf.begin() + s1, tunerBuf.begin() + s1 + n1, dest);
+    std::copy (tunerBuf.begin() + s2, tunerBuf.begin() + s2 + n2, dest + n1);
+    tunerFifo.finishedRead (n1 + n2);
+    return n1 + n2;
 }
 
 int SignalChain::readSpectrumSamples (float* dest, int maxSamples) noexcept

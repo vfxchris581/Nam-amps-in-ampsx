@@ -6,6 +6,8 @@ namespace namknobs
 AmpPanel::AmpPanel (NamKnobsProcessor& p)
     : proc (p),
       input (p.getAPVTS(), pid::input, "Input"), output (p.getAPVTS(), pid::output, "Output"),
+      gateThreshold (p.getAPVTS(), pid::gateThreshold, "Threshold"), gateRelease (p.getAPVTS(), pid::gateRelease, "Release"),
+      gateOn (p.getAPVTS(), pid::gateOn, "Noise Gate"),
       tube (p.getAPVTS(), pid::preTubeOn, "12AX7 Stage"), power (p.getAPVTS(), pid::powerAmpOn, "Power Amp"),
       harm (p.getAPVTS(), pid::harmOn, "Harmonics"), cab (p.getAPVTS(), pid::cabOn, "Cabinet")
 {
@@ -14,7 +16,12 @@ AmpPanel::AmpPanel (NamKnobsProcessor& p)
         knobs.push_back (std::make_unique<Knob> (p.getAPVTS(), controlId ((Control) k), controlName ((Control) k), true));
         addAndMakeVisible (*knobs.back());
     }
-    for (auto* c : { &input, &output }) addAndMakeVisible (*c);
+    for (auto* c : { &input, &output, &gateThreshold, &gateRelease }) addAndMakeVisible (*c);
+    addAndMakeVisible (gateOn);
+    gateOn.setTooltip ("Silences hiss and hum between notes. It listens to your guitar before the amp "
+                       "and mutes after it, so picks are never cut and chords ring out.");
+    gateThreshold.slider.setTooltip ("Raise until the hiss is gone when you stop playing; lower if note tails get cut.");
+    gateRelease.slider.setTooltip ("How quickly the gate closes once a note has died away.");
     for (int i = 0; i < AmpDefinition::kMaxBlendModels; ++i)
     {
         mixKnobs.push_back (std::make_unique<Knob> (p.getAPVTS(), pid::blendMix[i], "Model " + juce::String (i + 1)));
@@ -139,6 +146,18 @@ void AmpPanel::paint (juce::Graphics& g)
     // lower strip
     auto strip = getLocalBounds().toFloat().withTrimmedTop (plate.getBottom() + 18).reduced (24, 0).withTrimmedBottom (18);
     ui::drawPanel (g, strip);
+
+    // noise gate box with its activity LED
+    if (! gateArea.isEmpty())
+    {
+        const auto ga = gateArea.toFloat();
+        g.setColour (juce::Colours::black.withAlpha (0.22f));
+        g.fillRoundedRectangle (ga, 6.0f);
+        g.setColour (ui::gold.withAlpha (0.25f));
+        g.drawRoundedRectangle (ga, 6.0f, 1.0f);
+        const auto led = juce::Rectangle<float> (10, 10).withCentre ({ ga.getRight() - 16.0f, ga.getY() + 19.0f });
+        ui::drawLed (g, led, ui::green, gateLed > 0.5f);
+    }
     g.setColour (ui::textDim);
     g.setFont (ui::semi (10.5f).withExtraKerningFactor (0.2f));
     g.drawText (numMix > 0 ? juce::String::fromUTF8 ("SIGNAL CHAIN  \xc2\xb7  MODEL BLEND") : juce::String ("SIGNAL CHAIN"), strip.reduced (150, 12).removeFromTop (14), juce::Justification::centred);
@@ -163,6 +182,15 @@ void AmpPanel::resized()
     inMeter.setBounds (strip.removeFromLeft (8).reduced (0, 6));
     strip.removeFromLeft (8);
     input.setBounds (strip.removeFromLeft (96));
+    strip.removeFromLeft (14);
+    gateArea = strip.removeFromLeft (196).withTrimmedBottom (0);
+    {
+        auto ga = gateArea.reduced (8, 6);
+        gateOn.setBounds (ga.removeFromTop (28).withTrimmedRight (20));
+        ga.removeFromTop (2);
+        gateThreshold.setBounds (ga.removeFromLeft (ga.getWidth() / 2));
+        gateRelease.setBounds (ga);
+    }
     outMeter.setBounds (strip.removeFromRight (8).reduced (0, 6));
     strip.removeFromRight (8);
     output.setBounds (strip.removeFromRight (96));
@@ -184,6 +212,11 @@ void AmpPanel::timerCallback()
 {
     auto& ch = proc.getChain();
     inMeter.setLevel (ch.inputPeak.load());
+    const bool gateEnabled = proc.getAPVTS().getRawParameterValue (pid::gateOn)->load() > 0.5f;
+    const float led = gateEnabled ? ch.gateGain.load() : 0.0f;
+    if (std::abs (led - gateLed) > 0.05f) { gateLed = led; repaint (gateArea.withTrimmedLeft (gateArea.getWidth() - 30).withHeight (34)); }
+    gateThreshold.setAlpha (gateEnabled ? 1.0f : 0.45f);
+    gateRelease.setAlpha (gateEnabled ? 1.0f : 0.45f);
     outMeter.setLevel (ch.outputPeak.load());
     juce::String info;
     if (const auto* amp = proc.getCurrentAmp())

@@ -71,6 +71,10 @@ public:
     /** Tone Matrix loader: put a NAM file in a slot of the current blend (creates a blend if needed). */
     void loadBlendSlot (int slot, const juce::File& namFile);
     void clearBlendSlot (int slot);
+    /** Tone Matrix: empty all 18 loaders of the current blend. */
+    void clearAllBlendSlots();
+    /** Library: delete every amp / blend and its library copies of the captures. */
+    void deleteAllAmps();
 
     juce::String loadImpulseResponse (int slot, const juce::File& f);
     void clearImpulseResponse (int slot);
@@ -130,6 +134,7 @@ private:
             *ir1On, *ir1Level, *ir1Pan, *ir1Invert, *ir1Delay, *ir2On, *ir2Level, *ir2Pan, *ir2Invert, *ir2Delay;
         std::atomic<float>* blendMix[kBlendSlots];
         std::atomic<float>* matrixAuto = nullptr;
+        std::atomic<float>* gateOn = nullptr, *gateThreshold = nullptr, *gateRelease = nullptr;
         std::atomic<float>* phaseMode = nullptr;
         std::atomic<float>* eqOn = nullptr, *eqPost = nullptr, *eqOut = nullptr;
         std::atomic<float>* eqBand[7][5] {};

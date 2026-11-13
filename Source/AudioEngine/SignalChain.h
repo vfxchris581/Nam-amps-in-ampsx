@@ -1,9 +1,9 @@
 #pragma once
 // The complete Nam Knobs signal path:
 //
-//  in → input gain → [OS] 12AX7 stage [/OS] → gain residual → NAM capture blend (channel xfade)
+//  in → input gain → (gate detector) → [OS] 12AX7 stage [/OS] → gain residual → NAM capture blend (channel xfade)
 //     → make-up · volume → tone residual EQ → [OS] harmonic engine → power amp (master) [/OS]
-//     → dual-IR cabinet → output gain → out (stereo)
+//     → noise gate gain → studio EQ → dual-IR cabinet → output gain → out (stereo)
 //
 // 64-bit processing up to the cabinet; oversampling (2x/4x/8x, IIR low-latency or FIR linear
 // phase) around every nonlinearity that is not a NAM capture; denormals flushed; every level
@@ -21,6 +21,7 @@
 #include "HarmonicEngine/HarmonicEngine.h"
 #include "Convolution/DualCabinet.h"
 #include "ParametricEQ.h"
+#include "NoiseGate.h"
 
 namespace namknobs
 {
@@ -55,6 +56,10 @@ public:
 
     /** UI: pulls the most recent output samples (mono) for the spectrum analyser. Returns count. */
     int readSpectrumSamples (float* dest, int maxSamples) noexcept;
+    /** UI: pulls the most recent raw guitar input samples for the tuner (only fed while tunerActive). */
+    int readTunerSamples (float* dest, int maxSamples) noexcept;
+    std::atomic<bool> tunerActive { false }, tunerMute { false };
+    std::atomic<float> gateGain { 1.0f }; // current gate gain (UI LED)
     int getLatencySamples() const noexcept { return latency.load(); }
     double getSampleRate() const noexcept { return sampleRate; }
 
@@ -89,6 +94,11 @@ private:
     ToneMatch toneMatch;
     DualCabinet cabinet;
     ParametricEQ eq;
+    NoiseGate gate;
+    std::vector<double> gateBuf;
+    double muteEnv = 1.0;
+    juce::AbstractFifo tunerFifo { 32768 };
+    std::vector<float> tunerBuf = std::vector<float> (32768, 0.0f);
 
     Smoothed inGain, residualIn, residualOut, volumeGain, masterGain, outGain, tubeMix, tubeDrive, paDrive;
     double dipEnv = 1.0;

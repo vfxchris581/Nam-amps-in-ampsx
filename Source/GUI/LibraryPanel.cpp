@@ -107,6 +107,18 @@ LibraryPanel::LibraryPanel (NamKnobsProcessor& p) : proc (p)
                                                 juce::ModalCallbackFunction::create ([this, id] (int r) { if (r) { proc.deleteAmp (id); refresh(); } }));
         }
     };
+    deleteAllAmps.setColour (juce::TextButton::textColourOffId, ui::red.brighter (0.4f));
+    deleteAllAmps.setTooltip ("Empty the whole amp library (amps, blends and their copies of the NAM captures)");
+    deleteAllAmps.onClick = [this] {
+        const int n = (int) proc.getLibrary().getAmps().size();
+        if (n == 0) return;
+        juce::AlertWindow::showOkCancelBox (juce::MessageBoxIconType::WarningIcon, "Delete all amps & captures",
+            "Delete all " + juce::String (n) + (n == 1 ? " amp" : " amps") + " and blends, with the library's copies of their NAM captures?"
+            "\n\nYour original .nam files and your presets are not touched.",
+            "Delete all", "Cancel", this,
+            juce::ModalCallbackFunction::create ([this] (int r) { if (r) { proc.deleteAllAmps(); refresh(); } }));
+    };
+    addAndMakeVisible (deleteAllAmps);
     renameChannel.onClick = [this] {
         auto* a = selectedAmp();
         const int c = channelBox.getSelectedItemIndex();
@@ -228,6 +240,7 @@ void LibraryPanel::resized()
     newBlend.setBounds (side.removeFromTop (34));
     side.removeFromTop (6);
     blendHelp.setBounds (side.removeFromTop (64));
+    deleteAllAmps.setBounds (side.removeFromBottom (30));
 
     auto p = presetArea.reduced (16, 12);
     p.removeFromTop (24);

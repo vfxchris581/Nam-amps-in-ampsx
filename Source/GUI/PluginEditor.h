@@ -6,6 +6,7 @@
 #include "LibraryPanel.h"
 #include "ToneMatrixPanel.h"
 #include "EqPanel.h"
+#include "TunerPanel.h"
 
 namespace namknobs
 {
@@ -28,6 +29,8 @@ public:
 
     enum Tab { tabAmp = 0, tabToneMatrix, tabEq, tabCaptures, tabCabinet, tabTube, tabLibrary };
     void showTab (int index) { tabs.setCurrentTabIndex (index); }
+    void showTuner (bool show);
+    TunerPanel& getTuner() { return tunerPanel; }
     static constexpr int kWidth = 1180, kHeight = 740;
 
 private:
@@ -38,6 +41,7 @@ private:
     NamKnobsLookAndFeel lnf;
     juce::Component content;
     juce::ComboBox ampSelector, presetSelector;
+    juce::TextButton tunerButton { "Tuner" };
     juce::TextButton prevPreset { "<" }, nextPreset { ">" }, savePreset { "Save" };
     juce::TabbedComponent tabs { juce::TabbedButtonBar::TabsAtTop };
     AmpPanel ampPanel;
@@ -47,6 +51,7 @@ private:
     LibraryPanel libraryPanel;
     ToneMatrixPanel toneMatrixPanel;
     EqPanel eqPanel;
+    TunerPanel tunerPanel;
     bool dragging = false;
 };
 } // namespace namknobs

@@ -39,6 +39,7 @@ target_sources(NamKnobs PRIVATE
     ${PROJECT_SOURCE_DIR}/Source/GUI/LibraryPanel.cpp
     ${PROJECT_SOURCE_DIR}/Source/GUI/ToneMatrixPanel.cpp
     ${PROJECT_SOURCE_DIR}/Source/GUI/EqPanel.cpp
+    ${PROJECT_SOURCE_DIR}/Source/GUI/TunerPanel.cpp
     ${PROJECT_SOURCE_DIR}/Source/GUI/PluginEditor.cpp
     ${NAMKNOBS_CORE_ABS})
 
@@ -71,6 +72,7 @@ if(NAMKNOBS_BUILD_SCREENSHOT)
         ${PROJECT_SOURCE_DIR}/Source/GUI/LibraryPanel.cpp
         ${PROJECT_SOURCE_DIR}/Source/GUI/ToneMatrixPanel.cpp
         ${PROJECT_SOURCE_DIR}/Source/GUI/EqPanel.cpp
+        ${PROJECT_SOURCE_DIR}/Source/GUI/TunerPanel.cpp
         ${PROJECT_SOURCE_DIR}/Source/GUI/PluginEditor.cpp
         ${NAMKNOBS_CORE_ABS})
     target_compile_definitions(NamKnobsScreenshot PRIVATE JucePlugin_Name="Nam Knobs" NAMKNOBS_SCREENSHOT=1

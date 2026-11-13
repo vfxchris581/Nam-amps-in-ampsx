@@ -30,6 +30,9 @@ plug-ins and asks whether to keep your library (amps, blends, captures, presets)
 3. Open **Captures** to check the knob mapping. Values from file names are white, values estimated from the sound are amber with `~`, your own values are gold. Double-click to edit; type a channel name to move a capture; click **Apply mapping**.
 4. Captures without manufacturer/model metadata appear at the bottom of the Captures page — name them to add them to an amp.
 5. Load one or two cabinet IRs on **Cabinet** (or drop WAV files on the window).
+6. Click **Tuner** at the top to tune up (it mutes the output while open; untick *Mute output while tuning* to hear yourself).
+7. The **Noise Gate** on the Amp page is on by default. Raise *Threshold* until the hiss stops when you mute the strings; lower it if note tails get cut.
+8. To start over, **Delete all** on the Tone Matrix empties the 18 loaders; **Delete all amps & captures...** on Library empties the whole library. Your original .nam files are never touched.
 
 ## Naming captures so Nam Knobs reads every knob
 `<Amp> <channel> G<gain> B<bass> M<mid> T<treble> P<presence> R<resonance> V<volume>/MV<master>`

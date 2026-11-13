@@ -18,6 +18,9 @@ const std::vector<ParamSpec>& parameterSpecs()
         c (pid::channel, "Channel", { "1", "2", "3", "4", "5", "6" }, 0);
         f (pid::input, "Input", -24.0, 24.0, 0.0, "dB");
         f (pid::output, "Output", -36.0, 12.0, 0.0, "dB");
+        b (pid::gateOn, "Noise Gate", true);
+        f (pid::gateThreshold, "Gate Threshold", -96.0, -20.0, -66.0, "dB");
+        f (pid::gateRelease, "Gate Release", 10.0, 1000.0, 120.0, "ms", 150.0);
 
         b (pid::preTubeOn, "12AX7 Stage", false);
         f (pid::preTubeDrive, "Tube Drive", 0.0, 1.0, 0.3);

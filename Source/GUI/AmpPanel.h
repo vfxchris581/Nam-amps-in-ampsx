@@ -20,7 +20,10 @@ private:
     NamKnobsProcessor& proc;
     std::vector<std::unique_ptr<Knob>> knobs;
     juce::OwnedArray<juce::TextButton> channelButtons;
-    Knob input, output;
+    Knob input, output, gateThreshold, gateRelease;
+    Toggle gateOn;
+    juce::Rectangle<int> gateArea;
+    float gateLed = 0.0f;
     std::vector<std::unique_ptr<Knob>> mixKnobs;
     int numMix = 0;
     Toggle tube, power, harm, cab;

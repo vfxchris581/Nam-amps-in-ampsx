@@ -4,13 +4,21 @@ namespace namknobs
 {
 NamKnobsEditor::NamKnobsEditor (NamKnobsProcessor& p)
     : AudioProcessorEditor (p), proc (p),
-      ampPanel (p), capturesPanel (p), cabinetPanel (p), tubePanel (p), libraryPanel (p), toneMatrixPanel (p), eqPanel (p)
+      ampPanel (p), capturesPanel (p), cabinetPanel (p), tubePanel (p), libraryPanel (p), toneMatrixPanel (p), eqPanel (p), tunerPanel (p)
 {
     setLookAndFeel (&lnf);
     addAndMakeVisible (content);
     for (juce::Component* c : { (juce::Component*) &ampSelector, (juce::Component*) &presetSelector, (juce::Component*) &prevPreset,
                                 (juce::Component*) &nextPreset, (juce::Component*) &savePreset, (juce::Component*) &tabs })
         content.addAndMakeVisible (c);
+
+    content.addChildComponent (tunerPanel);
+    content.addAndMakeVisible (tunerButton);
+    tunerButton.setClickingTogglesState (true);
+    tunerButton.setTooltip ("Chromatic tuner");
+    tunerButton.setColour (juce::TextButton::buttonOnColourId, ui::gold.withAlpha (0.35f));
+    tunerButton.onClick = [this] { showTuner (tunerButton.getToggleState()); };
+    tunerPanel.onClose = [this] { showTuner (false); };
 
     tabs.setTabBarDepth (40);
     tabs.setOutline (0);
@@ -68,6 +76,13 @@ NamKnobsEditor::~NamKnobsEditor()
 {
     proc.removeChangeListener (this);
     setLookAndFeel (nullptr);
+}
+
+void NamKnobsEditor::showTuner (bool show)
+{
+    tunerButton.setToggleState (show, juce::dontSendNotification);
+    tunerPanel.setVisible (show);
+    if (show) tunerPanel.toFront (false);
 }
 
 void NamKnobsEditor::changeListenerCallback (juce::ChangeBroadcaster*) { refreshAll(); }
@@ -151,7 +166,10 @@ void NamKnobsEditor::resized()
     prevPreset.setBounds (header.removeFromRight (34));
     header.removeFromRight (18);
     ampSelector.setBounds (header.removeFromRight (260));
+    header.removeFromRight (14);
+    tunerButton.setBounds (header.removeFromRight (84));
     tabs.setBounds (r);
+    tunerPanel.setBounds (r);
 }
 
 bool NamKnobsEditor::isInterestedInFileDrag (const juce::StringArray& files)
