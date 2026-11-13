@@ -1342,6 +1342,27 @@ TEST (level_match_equalises_captures)
     CHECK (std::abs (mA - mB) < 0.5);                               // ...and now sit at one level
     CHECK (std::abs (mA - LevelMatch::kReferenceDb) < 1.0);
     CHECK (std::isnan (rt->matchDbForSlot (0, 7)));                 // empty slot
+
+    // the UI's copy of the blend agrees with the audio engine
+    const auto info = rt->blendInfo();
+    CHECK (info.size() == 1 && info[0].matchDb.size() == 2);
+    CHECK (std::abs (info[0].matchDb[0] - rt->matchDbForSlot (0, info[0].slot[0])) < 1e-9);
+    const KnobCoords kn { 9, 5, 5, 5, 5, 5, 5, 5 };
+    const auto ab1 = rt->autoBlend (0, kn), ab2 = AmpRuntime::autoBlendFor (info[0], kn);
+    CHECK (ab1.gain == ab2.gain && ab1.bands == ab2.bands);
+
+    // loading is parallel: 8 captures should not take 8x as long as one
+    AmpDefinition big = *lib.find (id);
+    for (int i = 0; i < 6; ++i) { auto e = big.channels[0].captures[(size_t) (i % 2)]; e.blendSlot = 2 + i; big.channels[0].captures.push_back (e); }
+    auto t0 = std::chrono::steady_clock::now();
+    auto one = AmpRuntime::build (*lib.find (id), fs, 256, {}, errors);
+    const double t2 = std::chrono::duration<double> (std::chrono::steady_clock::now() - t0).count();
+    t0 = std::chrono::steady_clock::now();
+    auto eight = AmpRuntime::build (big, fs, 256, {}, errors);
+    const double t8 = std::chrono::duration<double> (std::chrono::steady_clock::now() - t0).count();
+    INFO ("build: 2 captures %.2f s, 8 captures %.2f s (%u cores)", t2, t8, std::thread::hardware_concurrency());
+    CHECK (eight != nullptr && eight->blendInfo()[0].matchDb.size() == 8);
+    CHECK (std::abs (eight->blendInfo()[0].matchDb[2] - eight->blendInfo()[0].matchDb[0]) < 0.01); // same capture, same match
 }
 
 TEST (fine_tune_knobs_trim_each_band)

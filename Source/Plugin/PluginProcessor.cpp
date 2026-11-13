@@ -258,7 +258,7 @@ void NamKnobsProcessor::loadAmp (const juce::String& ampId)
 void NamKnobsProcessor::rebuildRuntime()
 {
     const auto* a = getCurrentAmp();
-    if (a == nullptr) { chain.publishRuntime (nullptr); return; }
+    if (a == nullptr) { chain.publishRuntime (nullptr); blendInfo.clear(); readyGeneration = buildGeneration.load(); return; }
     const AmpDefinition def = *a;
     const double sr = preparedRate > 0 ? preparedRate : 48000.0;
     const int block = std::max (64, preparedBlock > 0 ? preparedBlock : 512);
@@ -271,11 +271,22 @@ void NamKnobsProcessor::rebuildRuntime()
 
     workers.addJob ([this, def, sr, block, ro, gen] {
         std::vector<std::string> errors;
+        const auto t0 = juce::Time::getMillisecondCounterHiRes();
         auto rt = AmpRuntime::build (def, sr, block, ro, errors);
+        const double secs = (juce::Time::getMillisecondCounterHiRes() - t0) / 1000.0;
         if (gen != buildGeneration.load()) return; // superseded by a newer request
+        auto info = rt != nullptr ? rt->blendInfo() : std::vector<AmpRuntime::BlendChannelInfo>();
         chain.publishRuntime (std::move (rt));
+        failedCaptures = (int) errors.size();
+        juce::MessageManager::callAsync ([this, gen, info = std::move (info)]() mutable {
+            if (gen != buildGeneration.load()) return;
+            blendInfo = std::move (info);
+            readyGeneration = gen;
+            sendChangeMessage();
+        });
         juce::String msg = juce::String (def.name) + " ready - " + juce::String (def.totalCaptures()) + " captures, "
-                           + juce::String ((int) def.channels.size()) + (def.channels.size() == 1 ? " channel" : " channels");
+                           + juce::String ((int) def.channels.size()) + (def.channels.size() == 1 ? " channel" : " channels")
+                           + " (loaded in " + juce::String (secs, 1) + " s)";
         if (! errors.empty()) msg << "  (" << (int) errors.size() << " failed: " << juce::String (errors.front()) << ")";
         setStatus (msg);
     });

@@ -51,6 +51,19 @@ jobs:
         working-directory: build
         run: ctest -C Release --output-on-failure
 
+      - name: Check macOS binaries are universal (Apple Silicon + Intel)
+        if: runner.os == 'macOS'
+        run: |
+          ART="build/Source/Plugin/NamKnobs_artefacts/Release"
+          for b in "$ART/VST3/Nam Knobs.vst3/Contents/MacOS/Nam Knobs" \
+                   "$ART/AU/Nam Knobs.component/Contents/MacOS/Nam Knobs" \
+                   "$ART/Standalone/Nam Knobs.app/Contents/MacOS/Nam Knobs"; do
+            archs="$(lipo -archs "$b")"
+            minos="$(vtool -show-build "$b" 2>/dev/null | awk '/minos/ {print $2; exit}')"
+            echo "$(basename "$(dirname "$(dirname "$(dirname "$b")")")"): $archs (macOS $minos+)"
+            case "$archs" in *arm64*x86_64*|*x86_64*arm64*) ;; *) echo "::error::$b is not universal ($archs)"; exit 1 ;; esac
+          done
+
       - name: UI screenshots
         if: runner.os == 'Linux'
         run: |

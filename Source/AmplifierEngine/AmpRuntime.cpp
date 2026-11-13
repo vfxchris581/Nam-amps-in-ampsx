@@ -4,8 +4,10 @@
 #include "ProfileAnalyzer/ProfileAnalyzer.h"
 #include "ProfileInterpolation/PhaseMatcher.h"
 #include "LevelMatch.h"
+#include <atomic>
 #include <cmath>
 #include <limits>
+#include <thread>
 
 namespace namknobs
 {
@@ -17,6 +19,67 @@ std::unique_ptr<AmpRuntime> AmpRuntime::build (const AmpDefinition& def, double 
     rt->blend = def.isBlend;
     rt->channels.resize (def.channels.size());
 
+    // ---- 1. Load and measure every capture in parallel ------------------------------------------
+    // Each capture is played one continuous test signal: a guitar phrase (level match), a short
+    // gap, then the phase probe (phase matching), then flushed. Captures are independent, so this
+    // runs on several cores: an 18-capture blend is ready in about the time of a couple of captures.
+    struct Prep
+    {
+        const CaptureEntry* cap = nullptr;
+        std::unique_ptr<NamModel> model;
+        std::string error;
+        double loudnessDb = -200.0;
+        std::vector<double> probeOut; // response from the start of the probe (+ tail)
+    };
+    std::vector<std::vector<Prep>> prep (def.channels.size());
+    std::vector<Prep*> jobs;
+    for (size_t ci = 0; ci < def.channels.size(); ++ci)
+    {
+        for (const auto& cap : def.channels[ci].captures)
+            if (cap.enabled) { prep[ci].emplace_back(); prep[ci].back().cap = &cap; }
+        for (auto& pr : prep[ci]) jobs.push_back (&pr);
+    }
+    const auto phrase = LevelMatch::testPhrase (sr);
+    const auto probe = PhaseMatcher::makeProbe (sr);
+    const size_t gap = (size_t) (0.1 * sr), tail = (size_t) (0.1 * sr);
+    const size_t probeStart = phrase.size() + gap;
+    std::vector<double> testSignal (probeStart + probe.size() + tail, 0.0);
+    std::copy (phrase.begin(), phrase.end(), testSignal.begin());
+    std::copy (probe.begin(), probe.end(), testSignal.begin() + (long) probeStart);
+
+    auto work = [&] (Prep& pr) {
+        try
+        {
+            auto m = std::make_unique<NamModel>();
+            m->load (pr.cap->path);
+            m->prepare (sr, maxBlock);
+            std::vector<double> y (testSignal.size()), zeros ((size_t) maxBlock, 0.0), buf ((size_t) maxBlock);
+            for (size_t p = 0; p < testSignal.size(); p += (size_t) maxBlock)
+            {
+                const int n = (int) std::min ((size_t) maxBlock, testSignal.size() - p);
+                m->process (testSignal.data() + p, y.data() + p, n);
+            }
+            pr.loudnessDb = LevelMatch::loudnessDb (std::vector<double> (y.begin(), y.begin() + (long) phrase.size()), sr);
+            pr.probeOut.assign (y.begin() + (long) probeStart, y.end());
+            // flush the test signal out of the network's memory before real audio starts
+            for (int f = 0; f < (int) (0.2 * sr) / maxBlock + 1; ++f) m->process (zeros.data(), buf.data(), maxBlock);
+            pr.model = std::move (m);
+        }
+        catch (const std::exception& e) { pr.error = e.what(); }
+        catch (...) { pr.error = "could not load " + pr.cap->path; }
+    };
+    {
+        const int hw = (int) std::thread::hardware_concurrency();
+        const int nThreads = std::clamp (hw > 1 ? hw - 1 : 1, 1, std::min (8, std::max (1, (int) jobs.size())));
+        std::atomic<size_t> next { 0 };
+        auto runner = [&] { for (size_t j; (j = next.fetch_add (1)) < jobs.size();) work (*jobs[j]); };
+        std::vector<std::thread> pool;
+        for (int t = 1; t < nThreads; ++t) pool.emplace_back (runner);
+        runner();
+        for (auto& t : pool) t.join();
+    }
+
+    // ---- 2. Assemble each channel ---------------------------------------------------------------
     for (size_t ci = 0; ci < def.channels.size(); ++ci)
     {
         const auto& chDef = def.channels[ci];
@@ -24,27 +87,26 @@ std::unique_ptr<AmpRuntime> AmpRuntime::build (const AmpDefinition& def, double 
         std::vector<KnobCoords> coords;
         std::vector<bool> enabled;
         std::vector<const CaptureEntry*> used;
+        std::vector<Prep*> usedPrep;
+        (void) chDef;
 
-        for (const auto& cap : chDef.captures)
+        for (auto& pr : prep[ci])
         {
-            if (! cap.enabled) continue;
-            try
+            const auto& cap = *pr.cap;
+            if (pr.model == nullptr) { errors.push_back (pr.error); continue; }
             {
-                auto m = std::make_unique<NamModel>();
-                m->load (cap.path);
-                m->prepare (sr, maxBlock);
-                ch.models.push_back (std::move (m));
+                ch.models.push_back (std::move (pr.model));
                 std::array<double, 5> bd {};
                 if (cap.analysis && cap.analysis->valid)
                     for (int b = 0; b < 5; ++b) bd[(size_t) b] = cap.analysis->bandsDb[(size_t) b];
-                ch.bands.push_back (bd);
-                ch.gainFeature.push_back (cap.analysis && cap.analysis->valid ? ProfileAnalyzer::featureFor (Control::Gain, *cap.analysis) : 0.0);
-                ch.slot.push_back (std::clamp (cap.blendSlot >= 0 ? cap.blendSlot : (int) ch.slot.size(), 0, AmpDefinition::kMaxBlendModels - 1));
+                ch.info.bands.push_back (bd);
+                ch.info.gainFeature.push_back (cap.analysis && cap.analysis->valid ? ProfileAnalyzer::featureFor (Control::Gain, *cap.analysis) : 0.0);
+                ch.info.slot.push_back (std::clamp (cap.blendSlot >= 0 ? cap.blendSlot : (int) ch.info.slot.size(), 0, AmpDefinition::kMaxBlendModels - 1));
                 coords.push_back (cap.coords);
                 enabled.push_back (true);
                 used.push_back (&cap);
+                usedPrep.push_back (&pr);
             }
-            catch (const std::exception& e) { errors.push_back (e.what()); }
         }
 
         if (def.isBlend)
@@ -86,60 +148,30 @@ std::unique_ptr<AmpRuntime> AmpRuntime::build (const AmpDefinition& def, double 
             sources.push_back (s);
         }
 
-        // Level match: play every capture the same guitar phrase and measure how loud it sounds.
-        {
-            const auto phrase = LevelMatch::testPhrase (sr);
-            std::vector<double> y (phrase.size()), buf ((size_t) maxBlock), zeros ((size_t) maxBlock, 0.0);
-            for (auto& s : sources)
+        // Level match: how loud each capture sounded on the guitar phrase.
+        for (size_t i = 0; i < sources.size(); ++i)
+            if (usedPrep[i]->loudnessDb > -120.0)
             {
-                for (size_t p = 0; p < phrase.size(); p += (size_t) maxBlock)
-                {
-                    const int n = (int) std::min ((size_t) maxBlock, phrase.size() - p);
-                    s.model->process (phrase.data() + p, y.data() + p, n);
-                }
-                const double loud = LevelMatch::loudnessDb (y, sr);
-                if (loud > -120.0)
-                {
-                    s.matchDb = LevelMatch::correctionDb (loud);
-                    s.matchGain = dbToGain (s.matchDb);
-                }
-                for (int f = 0; f < (int) (0.4 * sr) / maxBlock + 1; ++f) s.model->process (zeros.data(), buf.data(), maxBlock);
+                sources[i].matchDb = LevelMatch::correctionDb (usedPrep[i]->loudnessDb);
+                sources[i].matchGain = dbToGain (sources[i].matchDb);
             }
-        }
+        for (auto& s : sources) ch.info.matchDb.push_back (s.matchDb);
 
         // Phase matching: play one probe through every capture, time-align by latency, then measure
         // each capture's residual (sub-sample) lag and polarity against the first capture.
         if (sources.size() >= 2)
         {
-            const auto probe = PhaseMatcher::makeProbe (sr);
             const int maxLag = (int) std::ceil (0.003 * sr);
             std::vector<std::vector<double>> resp (sources.size());
-            int maxTot = 0;
-            std::vector<int> tot (sources.size());
             for (size_t i = 0; i < sources.size(); ++i)
             {
-                tot[i] = sources[i].model->getResamplingLatency() + sources[i].intrinsicLatency;
-                maxTot = std::max (maxTot, tot[i]);
-            }
-            std::vector<double> buf ((size_t) maxBlock), zeros ((size_t) maxBlock, 0.0);
-            for (size_t i = 0; i < sources.size(); ++i)
-            {
-                auto* m = sources[i].model;
-                std::vector<double> y (probe.size() + (size_t) maxTot + (size_t) maxBlock, 0.0);
-                std::vector<double> x = probe;
-                x.resize (y.size(), 0.0);
-                for (size_t p = 0; p < x.size(); p += (size_t) maxBlock)
-                {
-                    const int n = (int) std::min ((size_t) maxBlock, x.size() - p);
-                    m->process (x.data() + p, y.data() + p, n);
-                }
                 // remove this capture's own latency (exactly what Time-aligned mode does)
+                const size_t tot = (size_t) std::max (0, sources[i].model->getResamplingLatency() + sources[i].intrinsicLatency);
+                const auto& y = usedPrep[i]->probeOut;
                 std::vector<double> a (probe.size(), 0.0);
                 for (size_t k = 0; k < a.size(); ++k)
-                    if (k + (size_t) tot[i] < y.size()) a[k] = y[k + (size_t) tot[i]];
+                    if (k + tot < y.size()) a[k] = y[k + tot];
                 resp[i] = std::move (a);
-                // flush the probe out of the network's memory before real audio starts
-                for (int f = 0; f < (int) (0.4 * sr) / maxBlock + 1; ++f) m->process (zeros.data(), buf.data(), maxBlock);
             }
             for (size_t i = 1; i < sources.size(); ++i)
             {
@@ -223,12 +255,12 @@ void AmpRuntime::setBlendLevels (int channel, const std::array<double, AmpDefini
     if (! blend || channel < 0 || channel >= (int) channels.size()) return;
     auto& ch = channels[(size_t) channel];
     InterpolationResult r;
-    const int n = std::min ({ ch.blender.numSources(), (int) ch.slot.size(), AmpDefinition::kMaxBlendModels });
+    const int n = std::min ({ ch.blender.numSources(), (int) ch.info.slot.size(), AmpDefinition::kMaxBlendModels });
     double sum = 0.0;
-    for (int i = 0; i < n; ++i) sum += std::max (0.0, levels[(size_t) ch.slot[(size_t) i]]);
+    for (int i = 0; i < n; ++i) sum += std::max (0.0, levels[(size_t) ch.info.slot[(size_t) i]]);
     for (int i = 0; i < n; ++i)
     {
-        const double w = std::max (0.0, levels[(size_t) ch.slot[(size_t) i]]);
+        const double w = std::max (0.0, levels[(size_t) ch.info.slot[(size_t) i]]);
         if (w <= 0.0 || sum <= 0.0) continue;
         r.index[(size_t) r.numActive] = i;
         r.weight[(size_t) r.numActive] = w / sum; // normalised: the blend keeps a constant level
@@ -240,9 +272,14 @@ void AmpRuntime::setBlendLevels (int channel, const std::array<double, AmpDefini
 std::array<double, 5> AmpRuntime::toneCorrection (int channel, const std::array<double, AmpDefinition::kMaxBlendModels>& gain,
                                                   const std::array<std::array<double, AmpDefinition::kMaxBlendModels>, 5>& bandLevels) const noexcept
 {
+    if (! blend || channel < 0 || channel >= (int) channels.size()) return {};
+    return toneCorrectionFor (channels[(size_t) channel].info, gain, bandLevels);
+}
+
+std::array<double, 5> AmpRuntime::toneCorrectionFor (const BlendChannelInfo& ch, const std::array<double, AmpDefinition::kMaxBlendModels>& gain,
+                                                     const std::array<std::array<double, AmpDefinition::kMaxBlendModels>, 5>& bandLevels) noexcept
+{
     std::array<double, 5> out {};
-    if (! blend || channel < 0 || channel >= (int) channels.size()) return out;
-    const auto& ch = channels[(size_t) channel];
     const int n = std::min ({ (int) ch.bands.size(), (int) ch.slot.size(), AmpDefinition::kMaxBlendModels });
     if (n == 0) return out;
     auto g = [&] (int m) { return std::max (0.0, gain[(size_t) ch.slot[(size_t) m]]); };
@@ -268,9 +305,20 @@ std::array<double, 5> AmpRuntime::toneCorrection (int channel, const std::array<
 
 AmpRuntime::AutoBlend AmpRuntime::autoBlend (int channel, const KnobCoords& k) const noexcept
 {
+    if (! blend || channel < 0 || channel >= (int) channels.size()) return {};
+    return autoBlendFor (channels[(size_t) channel].info, k);
+}
+
+std::vector<AmpRuntime::BlendChannelInfo> AmpRuntime::blendInfo() const
+{
+    std::vector<BlendChannelInfo> v;
+    for (auto& ch : channels) v.push_back (ch.info);
+    return v;
+}
+
+AmpRuntime::AutoBlend AmpRuntime::autoBlendFor (const BlendChannelInfo& ch, const KnobCoords& k) noexcept
+{
     AutoBlend a;
-    if (! blend || channel < 0 || channel >= (int) channels.size()) return a;
-    const auto& ch = channels[(size_t) channel];
     const int n = std::min ({ (int) ch.bands.size(), (int) ch.slot.size(), (int) ch.gainFeature.size(),
                               AmpDefinition::kMaxBlendModels, InterpolationResult::kMaxActive });
     if (n == 0) return a;
@@ -325,8 +373,8 @@ double AmpRuntime::matchDbForSlot (int channel, int slot) const noexcept
 {
     if (channel < 0 || channel >= (int) channels.size()) return std::numeric_limits<double>::quiet_NaN();
     const auto& ch = channels[(size_t) channel];
-    for (int i = 0; i < ch.blender.numSources() && i < (int) ch.slot.size(); ++i)
-        if (ch.slot[(size_t) i] == slot) return ch.blender.source (i).matchDb;
+    for (int i = 0; i < ch.blender.numSources() && i < (int) ch.info.slot.size(); ++i)
+        if (ch.info.slot[(size_t) i] == slot) return ch.blender.source (i).matchDb;
     return std::numeric_limits<double>::quiet_NaN();
 }
 
@@ -334,8 +382,8 @@ void AmpRuntime::setSlotPolarity (int channel, const std::array<bool, AmpDefinit
 {
     if (channel < 0 || channel >= (int) channels.size()) return;
     auto& ch = channels[(size_t) channel];
-    for (int i = 0; i < ch.blender.numSources() && i < (int) ch.slot.size(); ++i)
-        ch.blender.setUserPolarity (i, invert[(size_t) ch.slot[(size_t) i]] ? -1 : 1);
+    for (int i = 0; i < ch.blender.numSources() && i < (int) ch.info.slot.size(); ++i)
+        ch.blender.setUserPolarity (i, invert[(size_t) ch.info.slot[(size_t) i]] ? -1 : 1);
 }
 
 AmpRuntime::PhaseInfo AmpRuntime::phaseInfo (int channel, int source) const noexcept

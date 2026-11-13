@@ -61,6 +61,12 @@ public:
     void importFiles (const juce::StringArray& paths);
     bool isImporting() const noexcept { return importing.load(); }
     juce::String getStatus() const;
+    /** True while the current amp's captures are still being loaded / measured. */
+    bool isRuntimeBuilding() const noexcept { return readyGeneration.load() != buildGeneration.load(); }
+    /** Number of captures of the current amp that failed to load in the last build. */
+    int getFailedCaptures() const noexcept { return failedCaptures.load(); }
+    /** Message thread: what the current amp's loaded captures are (Tone Matrix display). */
+    const std::vector<AmpRuntime::BlendChannelInfo>& getBlendInfo() const noexcept { return blendInfo; }
     std::vector<PendingCapture> getPending() const;
     void assignPending (int index, const juce::String& make, const juce::String& model, const juce::String& channel);
     void discardPending (int index);
@@ -115,7 +121,8 @@ private:
     juce::String irPaths[2];
     EngineOptions options;
     std::atomic<bool> importing { false };
-    std::atomic<int> buildGeneration { 0 };
+    std::atomic<int> buildGeneration { 0 }, readyGeneration { 0 }, failedCaptures { 0 };
+    std::vector<AmpRuntime::BlendChannelInfo> blendInfo; // message thread only
     std::atomic<int> pendingChannel { -1 };
     int lastChannel = 0;
     bool restoringChannelKnobs = false;

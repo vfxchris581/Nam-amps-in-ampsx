@@ -53,6 +53,22 @@ public:
     };
     AutoBlend autoBlend (int channel, const KnobCoords& knobs) const noexcept;
 
+    /** Everything the Tone Matrix needs to know about one channel's loaded captures (read-only
+        after build). The UI keeps a copy so it can show the blend and the level match even when
+        the host isn't running audio through the plug-in. */
+    struct BlendChannelInfo
+    {
+        std::vector<std::array<double, 5>> bands; // analysed tonal balance per source (dB)
+        std::vector<int> slot;                    // blends: Tone Matrix column of each source
+        std::vector<double> gainFeature;          // distortion measure per source (analysis)
+        std::vector<double> matchDb;              // level-match correction per source (dB)
+    };
+    std::vector<BlendChannelInfo> blendInfo() const;
+    static AutoBlend autoBlendFor (const BlendChannelInfo& ch, const KnobCoords& knobs) noexcept;
+    static std::array<double, 5> toneCorrectionFor (const BlendChannelInfo& ch,
+                                                    const std::array<double, AmpDefinition::kMaxBlendModels>& gainLevels,
+                                                    const std::array<std::array<double, AmpDefinition::kMaxBlendModels>, 5>& bandLevels) noexcept;
+
     /** Blend amps: per-band correction (dB) that gives the gain-source mix the tonal balance chosen
         per band. gainLevels = audio mix of the models; bandLevels[band][model] = source mix per band. */
     std::array<double, 5> toneCorrection (int channel, const std::array<double, AmpDefinition::kMaxBlendModels>& gainLevels,
@@ -83,9 +99,7 @@ private:
         CaptureBlender blender;
         KnobCoords baseline {};   // value used for uncovered controls
         IntDelay pad;             // equalises latency across channels
-        std::vector<std::array<double, 5>> bands; // analysed tonal balance per source (dB)
-        std::vector<int> slot;                    // blends: Tone Matrix column of each source
-        std::vector<double> gainFeature;          // distortion measure per source (analysis)
+        BlendChannelInfo info;
         std::vector<double> phaseCorrelation;     // probe correlation of each source vs source 0
     };
     std::vector<Channel> channels;

@@ -132,6 +132,10 @@ ToneMatrixPanel::ToneMatrixPanel (NamKnobsProcessor& p)
     levelMatch.setTooltip ("Plays every capture at the same loudness (measured the way your ear hears it), "
                            "so clean and high-gain captures sit at one level and blends don't jump in volume.");
     addAndMakeVisible (levelMatch);
+    statusLabel.setFont (ui::semi (11.5f));
+    statusLabel.setJustificationType (juce::Justification::centredLeft);
+    statusLabel.setMinimumHorizontalScale (0.7f);
+    addAndMakeVisible (statusLabel);
     addAndMakeVisible (resetAll);
     refresh();
     startTimerHz (15);
@@ -217,33 +221,89 @@ void ToneMatrixPanel::applyAutoState()
 
 void ToneMatrixPanel::timerCallback()
 {
-    if ((proc.getAPVTS().getRawParameterValue (pid::matrixAuto)->load() > 0.5f) != autoMode)
+    auto& st = proc.getAPVTS();
+    if ((st.getRawParameterValue (pid::matrixAuto)->load() > 0.5f) != autoMode)
     {
         applyAutoState();
         repaint();
     }
-    auto& ch = proc.getChain();
-    if (autoMode && numLoaded > 0)
+
+    // Everything below is worked out here from the loaded captures (not read back from the audio
+    // thread), so it is right even when the host isn't running audio through the plug-in.
+    const bool wasBuilding = building;
+    building = numLoaded > 0 && proc.isRuntimeBuilding();
+    const auto& info = proc.getBlendInfo();
+    const AmpRuntime::BlendChannelInfo* ci = (! building && ! info.empty()) ? &info.front() : nullptr;
+
+    KnobCoords knobs {};
+    for (int k = 0; k < kNumControls; ++k) knobs[(size_t) k] = st.getRawParameterValue (controlId ((Control) k))->load();
+    std::array<double, kSlots> gain {};
+    std::array<std::array<double, kSlots>, 5> bands {};
+    if (autoMode && ci != nullptr)
+    {
+        const auto ab = AmpRuntime::autoBlendFor (*ci, knobs);
+        gain = ab.gain;
+        bands = ab.bands;
+    }
+    else
+        for (int s = 0; s < kSlots; ++s)
+        {
+            gain[(size_t) s] = st.getRawParameterValue (pid::blendMix[s])->load();
+            for (int b = 0; b < 5; ++b) bands[(size_t) b][(size_t) s] = st.getRawParameterValue (pid::toneSource[b][s])->load();
+        }
+    if (autoMode)
         for (int r = 0; r < kRows; ++r)
             for (int s = 0; s < kSlots; ++s)
-                if (loaded[s]) { cells[r][s]->setValue (ch.matrixWeights[(size_t) r][(size_t) s].load(), juce::dontSendNotification); cells[r][s]->repaint(); }
-    const bool lm = proc.getAPVTS().getRawParameterValue (pid::levelMatch)->load() > 0.5f;
+                {
+                    // empty loaders show 0 in Auto (they take no part); loading shows 0 until measured
+                    const double v = (ci == nullptr || ! loaded[s]) ? 0.0 : (r == 0 ? gain[(size_t) s] : bands[(size_t) r - 1][(size_t) s]);
+                    if (std::abs (cells[r][s]->getValue() - v) > 1e-4) { cells[r][s]->setValue (v, juce::dontSendNotification); cells[r][s]->repaint(); }
+                }
+
+    // level match per loader (and loaders whose capture failed to load)
+    const bool lm = st.getRawParameterValue (pid::levelMatch)->load() > 0.5f;
     for (int s = 0; s < kSlots; ++s)
     {
-        const float v = ch.slotMatchDb[(size_t) s].load();
-        const bool show = loaded[s] && std::isfinite (v);
-        const auto txt = show ? (v >= 0.0f ? "+" : "") + juce::String (v, 1) : juce::String();
+        juce::String txt;
+        bool failed = false;
+        if (loaded[s] && ci != nullptr)
+        {
+            failed = true;
+            for (size_t i = 0; i < ci->slot.size() && i < ci->matchDb.size(); ++i)
+                if (ci->slot[i] == s)
+                {
+                    const double v = ci->matchDb[i];
+                    txt = (v >= 0.0 ? "+" : "") + juce::String (v, 1);
+                    failed = false;
+                }
+            if (failed) txt = "failed";
+        }
+        else if (loaded[s] && building)
+            txt = juce::String::fromUTF8 ("\xe2\x80\xa6"); // ...
         if (matchLabel[s].getText() != txt) matchLabel[s].setText (txt, juce::dontSendNotification);
-        matchLabel[s].setVisible (show);
-        matchLabel[s].setAlpha (lm ? 1.0f : 0.35f);
+        matchLabel[s].setColour (juce::Label::textColourId, failed ? ui::red : ui::green.withAlpha (0.85f));
+        matchLabel[s].setVisible (txt.isNotEmpty());
+        matchLabel[s].setAlpha (lm || failed ? 1.0f : 0.35f);
     }
+
+    // applied band change = what the matrix asks for + the fine-tune knobs
+    std::array<double, 5> corr {};
+    if (ci != nullptr) corr = AmpRuntime::toneCorrectionFor (*ci, gain, bands);
     for (int r = 1; r < kRows; ++r)
     {
-        const float db = ch.toneCorrectionDb[(size_t) (r - 1)].load();
-        const auto txt = std::abs (db) < 0.05f ? juce::String ("0.0 dB") : (db > 0 ? "+" : "") + juce::String (db, 1) + " dB";
-        readout[r].setColour (juce::Label::textColourId, std::abs (db) < 0.05f ? ui::textDim : ui::amber);
+        const double db = corr[(size_t) r - 1] + st.getRawParameterValue (pid::toneTrim[r - 1])->load();
+        const auto txt = std::abs (db) < 0.05 ? juce::String ("0.0 dB") : (db > 0 ? "+" : "") + juce::String (db, 1) + " dB";
+        readout[r].setColour (juce::Label::textColourId, std::abs (db) < 0.05 ? ui::textDim : ui::amber);
         if (readout[r].getText() != txt) readout[r].setText (txt, juce::dontSendNotification);
     }
+
+    // status line: loading progress, failures, or what's loaded
+    juce::String status;
+    if (building) status = "Loading and level-matching " + juce::String (numLoaded) + (numLoaded == 1 ? " capture..." : " captures...");
+    else if (proc.getFailedCaptures() > 0) status = proc.getStatus();
+    statusLabel.setColour (juce::Label::textColourId, proc.getFailedCaptures() > 0 && ! building ? ui::red.brighter (0.3f) : ui::amber);
+    if (statusLabel.getText() != status) statusLabel.setText (status, juce::dontSendNotification);
+    if (building != wasBuilding) repaint (plate);
 }
 
 void ToneMatrixPanel::paint (juce::Graphics& g)
@@ -256,7 +316,8 @@ void ToneMatrixPanel::paint (juce::Graphics& g)
     ui::drawFaceplate (g, plate.toFloat());
     g.setColour (ui::ink.withAlpha (0.65f));
     g.setFont (ui::semi (11.0f).withExtraKerningFactor (0.22f));
-    g.drawText (numLoaded > 0 ? juce::String (numLoaded) + (numLoaded == 1 ? " CAPTURE" : " CAPTURES") + " PLAYING AS ONE AMP"
+    g.drawText (building ? juce::String ("LOADING ") + juce::String (numLoaded) + (numLoaded == 1 ? " CAPTURE..." : " CAPTURES...")
+              : numLoaded > 0 ? juce::String (numLoaded) + (numLoaded == 1 ? " CAPTURE" : " CAPTURES") + " PLAYING AS ONE AMP"
                               : juce::String ("LOAD CAPTURES ABOVE - THEY BECOME ONE AMP"),
                 plate.reduced (40, 0).removeFromTop (30).translated (0, 6), juce::Justification::centred);
 
@@ -291,6 +352,8 @@ void ToneMatrixPanel::resized()
         deleteAll.setBounds (head.removeFromRight (92));
         head.removeFromRight (16);
         levelMatch.setBounds (head.removeFromRight (124));
+        head.removeFromLeft (230); // panel title
+        statusLabel.setBounds (head.reduced (8, 0));
         a.removeFromTop (2);
         const int perRow = (kSlots + 1) / 2;
         const int w = a.getWidth() / perRow, h = a.getHeight() / 2;

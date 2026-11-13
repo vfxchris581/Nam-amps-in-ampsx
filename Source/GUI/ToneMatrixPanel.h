@@ -41,6 +41,7 @@ private:
     juce::Label phaseLabel { {}, "Phase" };
     juce::Label names[kSlots], matchLabel[kSlots], readout[kRows];
     Toggle levelMatch;
+    juce::Label statusLabel;
     juce::Slider trim[kRows];                                  // fine-tune per tone row (rows 1..5)
     std::unique_ptr<APVTS::SliderAttachment> trimAttach[kRows];
     Toggle autoToggle;
@@ -50,7 +51,7 @@ private:
 
     bool loaded[kSlots] {};
     int numLoaded = 0;
-    bool autoMode = true, lastAuto = true;
+    bool autoMode = true, lastAuto = true, building = false;
     juce::Rectangle<int> slotsArea, plate, matrixArea, grid;
     int labelW = 150, readW = 58, nameW = 104;
 };
